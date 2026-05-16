@@ -1,0 +1,234 @@
+#  block-lock: Master Product Backlog & Acceptance Criteria
+
+##  Phase 1: Workspace Architecture & Local Environment
+
+### Issue #1: Monorepo & Dependency Workspace Setup
+*   **Description:** Initialize the overarching project repository structure using `pnpm` workspaces to manage decoupled runtime codebases.
+*   **Acceptance Criteria:**
+    *   [ ] Root `package.json` created defining workspaces for `apps/web`, `services/extension`, and `packages/shared-types`.
+    *   [ ] `pnpm-workspace.yaml` configured at the root directory.
+    *   [ ] Global `.gitignore` implemented protecting system files, `node_modules`, `.next/`, and `.env` files.
+*   **Status:**
+    - [ ] Setup Complete
+
+### Issue #2: Turborepo Orchestration & Global Linting
+*   **Description:** Configure Turborepo to cache tasks and build pipelines, alongside an immutable global linting matrix.
+*   **Acceptance Criteria:**
+    *   [ ] `turbo.json` created defining build, lint, and test pipelines with strict dependency topology.
+    *   [ ] Root ESLint and Prettier configurations initialized and inherited by all workspaces.
+    *   [ ] Commands `pnpm build`, `pnpm lint`, and `pnpm test` executable from root across all workspaces without workspace bleeding.
+*   **Status:**
+    - [ ] Setup Complete
+
+### Issue #3: Multi-Container Docker Infrastructure for Local Development
+*   **Description:** Construct a containerized environment to instantly spin up localized isolated data layers.
+*   **Acceptance Criteria:**
+    *   [ ] `docker-compose.yml` configured to spin up a PostgreSQL instance and a Redis instance locally.
+    *   [ ] Health checks implemented to verify services are fully running before allowing app bindings.
+    *   [ ] Persistent Docker volumes mapped so database records persist across container restarts.
+*   **Status:**
+    - [ ] Setup Complete
+
+---
+
+##  Phase 2: Web Infrastructure & Data Modeling (apps/web)
+
+### Issue #4: Prisma Schema Design & Relational Topology
+*   **Description:** Set up the database data models using Prisma to map rules, schedules, logs, and users.
+*   **Acceptance Criteria:**
+    *   [ ] `schema.prisma` created containing relational models for `User`, `Schedule`, `TimeLimit`, and `UsageLog`.
+    *   [ ] Cascading deletes (`onDelete: Cascade`) enforced on all relational user models to prevent orphan row memory leaks.
+    *   [ ] Initial migration successfully applied to the local PostgreSQL instance via `prisma migrate dev`.
+*   **Status:**
+    - [ ] Code Complete
+    - [ ] Test/Compliance Checked
+
+### Issue #5: Auth.js Authentication & Secure Middleware Guarding
+*   **Description:** Integrate enterprise-grade OAuth session handling and network-edge route blocking.
+*   **Acceptance Criteria:**
+    *   [ ] Auth.js (NextAuth) handlers initialized under `/app/api/auth/[...nextauth]` with Google or GitHub providers.
+    *   [ ] Next.js edge-level `middleware.ts` intercepts all requests to `/dashboard*` and `/api/*`.
+    *   [ ] Unauthenticated requests are rejected with an explicit `401 Unauthorized` status for APIs, or redirect to `/login` for pages.
+*   **Status:**
+    - [ ] Code Complete
+    - [ ] Test/Compliance Checked
+
+### Issue #6: Centralized Validation Layer (packages/shared-types)
+*   **Description:** Build the contract validation tier to manage structural mutations between client interfaces and server boundaries.
+*   **Acceptance Criteria:**
+    *   [ ] Workspace initialized to export standalone TypeScript inference models out of **Zod schemas**.
+    *   [ ] Form configurations (Schedule creation, rule parameters) mapped explicitly to Zod primitives.
+    *   [ ] Zero instances of the JavaScript fallback runtime `any` keyword present in data schema targets.
+*   **Status:**
+    - [ ] Code Complete
+    - [ ] Test/Compliance Checked
+
+### Issue #7: Database Server Actions & Transactional Mutators
+*   **Description:** Implement backend business logic routes handling UI mutations safely.
+*   **Acceptance Criteria:**
+    *   [ ] Next.js Server Actions created to handle creation/deletion of block schedules.
+    *   [ ] Data arrays pass through Zod validations on the server before mutating database entries.
+    *   [ ] Write blocks are enveloped within an atomic Prisma `$transaction` pipeline.
+*   **Status:**
+    - [ ] Code Complete
+    - [ ] Test/Compliance Checked
+
+### Issue #8: Next.js Frontend Dashboard Interface
+*   **Description:** Assemble the administration web panel using modern accessible UI layers.
+*   **Acceptance Criteria:**
+    *   [ ] Fully styled `/dashboard` page built utilizing `shadcn/ui` design primitives.
+    *   [ ] Interactive React Hook Forms managing inputs dynamically with embedded loading indicators.
+    *   [ ] Global nested **React Error Boundaries** configured to catch interface failures gracefully without throwing white screens.
+*   **Status:**
+    - [ ] Code Complete
+    - [ ] Test/Compliance Checked
+
+---
+
+##  Phase 3: High-Performance Cache-First Sync Engine
+
+### Issue #9: Redis Rate-Limiter API Layer
+*   **Description:** Build the infrastructure protection barrier inside the sync pipeline to mitigate denial-of-service loops.
+*   **Acceptance Criteria:**
+    *   [ ] Sliding-window rate limiter utilizing Upstash or Redis commands mapped over inbound user tracking calls.
+    *   [ ] Requests breaking the standard allotment threshold are dropped instantly, throwing a `429 Too Many Requests` response.
+    *   [ ] Next.js doesn't open database connections when requests are dropped by the rate limiter.
+*   **Status:**
+    - [ ] Code Complete
+    - [ ] Test/Compliance Checked
+
+### Issue #10: Read-Aside Cache Middleware Optimization
+*   **Description:** Implement high-speed caching routes to minimize database queries during client synchronization.
+*   **Acceptance Criteria:**
+    *   [ ] Endpoint `/api/sync` checks the Redis cluster for keys patterned under `user:rules:{userId}` first.
+    *   [ ] **Cache Hit:** Content strings return immediately to the client in sub-milliseconds without firing Prisma calls.
+    *   [ ] **Cache Miss:** Next.js queries PostgreSQL via Prisma, compiles rules, updates Redis with a strict Time-To-Live (TTL), and returns data.
+*   **Status:**
+    - [ ] Code Complete
+    - [ ] Test/Compliance Checked
+
+### Issue #11: Cache Invalidation Real-Time Invalidation
+*   **Description:** Bind data mutations to real-time cache purging actions to prevent stale state bugs.
+*   **Acceptance Criteria:**
+    *   [ ] Any successful Prisma schedule transaction executes an asymmetric call to evict/delete the specific user's Redis entry.
+    *   [ ] Sub-workspace communication pipelines guarantee eviction runs before confirming mutations to the client web UI.
+*   **Status:**
+    - [ ] Code Complete
+    - [ ] Test/Compliance Checked
+
+---
+
+##  Phase 4: Browser Extension Engine (services/extension)
+
+### Issue #12: Manifest V3 Foundation & Extension Popup UI
+*   **Description:** Scaffold the background architecture for modern web standard extension sandboxes.
+*   **Acceptance Criteria:**
+    *   [ ] `manifest.json` configured using version 3 specification parameters with host permissions granted explicitly.
+    *   [ ] Action icon launches a lightweight Popup view (`popup.tsx`) showing account binding states.
+    *   [ ] Tailwind UI elements adapt dynamically to variable browser panel sizing constraints.
+*   **Status:**
+    - [ ] Code Complete
+    - [ ] Test/Compliance Checked
+
+### Issue #13: Web-to-Extension Authentication Exchange
+*   **Description:** Bridge cookie contexts safely into local extensions to bind browsing rules to authenticated backend users.
+*   **Acceptance Criteria:**
+    *   [ ] Background engine securely captures web authentication credentials via the `chrome.cookies` or `chrome.runtime` messaging pathways.
+    *   [ ] Extracted JWT identifiers are safely stored within local `chrome.storage.local` encrypted structures.
+    *   [ ] Extension flags connection errors clearly on the UI if tracking contexts become missing or expired.
+*   **Status:**
+    - [ ] Code Complete
+    - [ ] Test/Compliance Checked
+
+### Issue #14: Rule Compiler for Native Browser Engines
+*   **Description:** Translate server-side rule schemas into native browser structures.
+*   **Acceptance Criteria:**
+    *   [ ] Background logic parses raw domain strings into specialized regex conditions mapped precisely to `declarativeNetRequest` JSON block actions.
+    *   [ ] Rules compile automatically and handle multiple distinct edge cases, such as isolating `subdomain.domain.com` without dropping access to base domains.
+*   **Status:**
+    - [ ] Code Complete
+    - [ ] Test/Compliance Checked
+
+### Issue #15: Native Traffic Interception Engine
+*   **Description:** Pass rules into the browser engine to block websites with zero lag.
+*   **Acceptance Criteria:**
+    *   [ ] Compiled user rule blocks are written into Chrome's native engine via `chrome.declarativeNetRequest.updateDynamicRules`.
+    *   [ ] The browser blocks restricted domains instantly on a native thread before pages resolve network packets or generate browser processes.
+    *   [ ] Memory foot-print of the extension worker matches baseline thread metrics (~0MB idle overhead).
+*   **Status:**
+    - [ ] Code Complete
+    - [ ] Test/Compliance Checked
+
+---
+
+##  Phase 5: High-Throughput Analytics Pipeline
+
+### Issue #16: Offline Analytics Accumulation Buffer
+*   **Description:** Implement low-frequency client trackers to collect browsing intervals locally.
+*   **Acceptance Criteria:**
+    *   [ ] Service worker monitors active browser tab navigation events using the `chrome.tabs` framework.
+    *   [ ] Local data accumulators increment usage metrics within a local `chrome.storage.local` array.
+    *   [ ] Individual page actions **never** trigger immediate server network calls, preventing data flood loops.
+*   **Status:**
+    - [ ] Code Complete
+    - [ ] Test/Compliance Checked
+
+### Issue #17: Aggregated Analytics Batch Ingestion
+*   **Description:** Build scheduled network flash procedures to stream analytics data cleanly.
+*   **Acceptance Criteria:**
+    *   [ ] background worker sets up a low-latency cron interval to flush accumulators to the server once every 5 minutes.
+    *   [ ] `/api/analytics` parses the payload against a strict Zod schema to verify data integrity.
+    *   [ ] Data arrays execute multiple writes to PostgreSQL inside a high-speed Prisma `createMany` batch operation.
+*   **Status:**
+    - [ ] Code Complete
+    - [ ] Test/Compliance Checked
+
+### Issue #18: Analytics Dashboard Charts
+*   **Description:** Render raw backend analytical telemetry rows into clear dashboard data charts.
+*   **Acceptance Criteria:**
+    *   [ ] Secure `/dashboard/analytics` view built using the Next.js App router paradigm.
+    *   [ ] Time logs are parsed using Prisma aggregations to plot minute tracks cleanly across multiple timeline scopes.
+    *   [ ] Frontend graphs are rendered using `recharts` to map time saved and total browsing duration.
+*   **Status:**
+    - [ ] Code Complete
+    - [ ] Test/Compliance Checked
+
+---
+
+##  Phase 6: Core Verification & Automation Pipelines
+
+### Issue #19: Vitest Integration Testing Matrix
+*   **Description:** Establish isolated test systems ensuring critical code boundaries cannot break.
+*   **Acceptance Criteria:**
+    *   [ ] Unit tests implemented via **Vitest** covering core schedule overlapping equations.
+    *   [ ] Mock infrastructure checks verify `/api/sync` runs purely from Redis during cache hits without engaging Prisma.
+    *   [ ] Zod verification flows fail expected schema parameters when feeding garbage arguments.
+*   **Status:**
+    - [ ] Test/Compliance Checked
+
+### Issue #20: Playwright Extension E2E Test Verification
+*   **Description:** Create end-to-end user path verifications validating engine execution flows.
+*   **Acceptance Criteria:**
+    *   [ ] **Playwright** framework configures headless Chromium profiles to load the built extension asset manually.
+    *   [ ] Automated tests navigate onto a designated test web domain and confirm navigation is blocked.
+    *   [ ] Logs confirm that checking active elements yields redirected destination contexts matching the active configuration rules.
+*   **Status:**
+    - [ ] Test/Compliance Checked
+
+### Issue #21: GitHub Actions CI/CD Pipeline Configuration
+*   **Description:** Construct automated regression control loops operating over code pushes.
+*   **Acceptance Criteria:**
+    *   [ ] Workflow script file `.github/workflows/ci.yml` initialized.
+    *   [ ] Every incoming Pull Request to the main branch automatically sets up a pnpm store and runs structural TypeScript type-checks.
+    *   [ ] Changes block integration merges unless all code patterns pass the lint checks and Vitest coverage suites successfully.
+*   **Status:**
+    - [ ] Setup Complete
+
+### Issue #22: Multi-Environment Production Deployments
+*   **Description:** Map the code artifacts directly onto server hosts to run for actual active users.
+*   **Acceptance Criteria:**
+    *   [ ] Web Workspace configures seamless production deployment tracking onto Vercel hooked directly to production PostgreSQL targets.
+    *   [ ] Upstash Redis cluster keys map automatically matching environmental variable arrays inside production environments.
+    *   [ ] Build scripts compile production-grade production extension zip archives under `services/extension/dist/` ready to upload to the Chrome Web Store.
+*   **Status:**
+    - [ ] Setup Complete
