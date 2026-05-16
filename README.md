@@ -1,0 +1,2 @@
+# block-lock
+A high-performance, open-source B2C productivity ecosystem combining a Next.js web dashboard and a Manifest V3 browser extension to dynamically block and limit distracting websites based on custom schedules.
