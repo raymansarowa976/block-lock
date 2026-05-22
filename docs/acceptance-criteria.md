@@ -232,3 +232,43 @@
     *   [ ] Build scripts compile production-grade production extension zip archives under `services/extension/dist/` ready to upload to the Chrome Web Store.
 *   **Status:**
     - [ ] Setup Complete
+## Phase 7: AI Engineering & Semantic Intelligence Tier
+
+### Issue #23: Vercel AI SDK Integration & Structured Output Pipeline
+*   **Description:** Integrate the Vercel AI SDK into the Next.js API layer to handle natural language scheduling requests, translating raw human intents into structured database schemas.
+*   **Acceptance Criteria:**
+    *   [ ] Next.js endpoint initialized with the `ai` SDK package and connected securely to an upstream model provider (OpenAI/Anthropic).
+    *   [ ] System prompt forces strict **Structured JSON Output** utilizing a shared Zod schema matching the relational `Schedule` parameters.
+    *   [ ] Natural language strings (e.g., *"Block social media while I work on my CS classes from 9 to 5"*) are successfully parsed into valid, array-backed block records with zero manual input.
+*   **Status:**
+    - [ ] Code Complete
+    - [ ] Test/Compliance Checked
+
+### Issue #24: Semantic Domain Classification Engine via pgvector
+*   **Description:** Construct an automated backend pipeline to map unknown web domains into high-dimensional vector spaces, catching evasive distraction sites through semantic similarity instead of hardcoded keyword lists.
+*   **Acceptance Criteria:**
+    *   [ ] Prisma schema updated to inject the native `pgvector` database extension into the PostgreSQL instance.
+    *   [ ] Internal API route intercepts unclassified metadata logs sent by the extension, generating a 1536-dimensional embedding using an industry-standard model (e.g., `text-embedding-3-small`).
+    *   [ ] Verification queries utilize cosine similarity mathematical operations (`<->` vector operator) to match site signatures against predefined distraction baselines, auto-blocking matches that cross an 85% confidence score.
+*   **Status:**
+    - [ ] Code Complete
+    - [ ] Test/Compliance Checked
+
+### Issue #25: AI Productivity Coach & Behavioral Telemetry Aggregator
+*   **Description:** Build an asynchronous batch analyzer that looks over large historical sets of `UsageLog` data points to compile highly contextual, proactive digital wellness recommendations.
+*   **Acceptance Criteria:**
+    *   [ ] Crontab routine executes a database aggregation that summarizes user metrics across a trailing 7-day window.
+    *   [ ] Data arrays are injected cleanly into a contextual prompt window, mapping specific focus drop patterns (e.g., micro-relapses into social media).
+    *   [ ] System processes insights cleanly via dynamic markdown interfaces inside the `/dashboard/intelligence` view panel.
+*   **Status:**
+    - [ ] Code Complete
+    - [ ] Test/Compliance Checked
+
+### Issue #26: AI Engine Validation & Error Mitigation Matrix
+*   **Description:** Construct dedicated unit test suites to protect the application backend against LLM hallucinations, structural drifts, or corrupted payload formatting.
+*   **Acceptance Criteria:**
+    *   [ ] Isolated test suites created using **Vitest** that securely mock model API responses.
+    *   [ ] Validation checkpoints catch and reject malformed JSON objects before they reach Prisma to guarantee database entity integrity.
+    *   [ ] System handles nonsensical or empty conversational strings gracefully, returning standardized payload signatures (`{ success: false, error: "..." }`) rather than running broken database operations.
+*   **Status:**
+    - [ ] Test/Compliance Checked
