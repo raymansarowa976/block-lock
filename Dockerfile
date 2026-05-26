@@ -18,6 +18,8 @@ COPY --from=builder /app/out/json/ .
 COPY --from=builder /app/out/pnpm-lock.yaml ./pnpm-lock.yaml
 RUN pnpm install --frozen-lockfile
 COPY --from=builder /app/out/full/ .
+# Ensure root tsconfig is present for packages that extend it
+COPY --from=builder /app/tsconfig.json ./tsconfig.json
 RUN pnpm turbo build --filter=web...
 
 FROM base AS runner
