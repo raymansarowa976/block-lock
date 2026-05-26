@@ -5,29 +5,29 @@
 ### Issue #1: Monorepo & Dependency Workspace Setup
 *   **Description:** Initialize the overarching project repository structure using `pnpm` workspaces to manage decoupled runtime codebases.
 *   **Acceptance Criteria:**
-    *   [ ] Root `package.json` created defining workspaces for `apps/web`, `services/extension`, and `packages/shared-types`.
-    *   [ ] `pnpm-workspace.yaml` configured at the root directory.
-    *   [ ] Global `.gitignore` implemented protecting system files, `node_modules`, `.next/`, and `.env` files.
+    *   [x] Root `package.json` created defining workspaces for `apps/web`, `services/extension`, and `packages/shared-types`.
+    *   [x] `pnpm-workspace.yaml` configured at the root directory.
+    *   [x] Global `.gitignore` implemented protecting system files, `node_modules`, `.next/`, and `.env` files.
 *   **Status:**
-    - [ ] Setup Complete
+    - [x] Setup Complete
 
 ### Issue #2: Turborepo Orchestration & Global Linting
 *   **Description:** Configure Turborepo to cache tasks and build pipelines, alongside an immutable global linting matrix.
 *   **Acceptance Criteria:**
-    *   [ ] `turbo.json` created defining build, lint, and test pipelines with strict dependency topology.
-    *   [ ] Root ESLint and Prettier configurations initialized and inherited by all workspaces.
-    *   [ ] Commands `pnpm build`, `pnpm lint`, and `pnpm test` executable from root across all workspaces without workspace bleeding.
+    *   [x] `turbo.json` created defining build, lint, and test pipelines with strict dependency topology.
+    *   [x] Root ESLint and Prettier configurations initialized and inherited by all workspaces.
+    *   [x] Commands `pnpm build`, `pnpm lint`, and `pnpm test` executable from root across all workspaces without workspace bleeding.
 *   **Status:**
-    - [ ] Setup Complete
+    - [x] Setup Complete
 
 ### Issue #3: Multi-Container Docker Infrastructure for Local Development
 *   **Description:** Construct a containerized environment to instantly spin up localized isolated data layers.
 *   **Acceptance Criteria:**
-    *   [ ] `docker-compose.yml` configured to spin up a PostgreSQL instance and a Redis instance locally.
-    *   [ ] Health checks implemented to verify services are fully running before allowing app bindings.
-    *   [ ] Persistent Docker volumes mapped so database records persist across container restarts.
+    *   [x] `docker-compose.yml` configured to spin up a PostgreSQL instance and a Redis instance locally.
+    *   [x] Health checks implemented to verify services are fully running before allowing app bindings.
+    *   [x] Persistent Docker volumes mapped so database records persist across container restarts.
 *   **Status:**
-    - [ ] Setup Complete
+    - [x] Setup Complete
 
 ---
 
