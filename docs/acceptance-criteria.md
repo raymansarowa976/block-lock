@@ -36,12 +36,12 @@
 ### Issue #4: Prisma Schema Design & Relational Topology
 *   **Description:** Set up the database data models using Prisma to map rules, schedules, logs, and users.
 *   **Acceptance Criteria:**
-    *   [ ] `schema.prisma` created containing relational models for `User`, `Schedule`, `TimeLimit`, and `UsageLog`.
-    *   [ ] Cascading deletes (`onDelete: Cascade`) enforced on all relational user models to prevent orphan row memory leaks.
-    *   [ ] Initial migration successfully applied to the local PostgreSQL instance via `prisma migrate dev`.
+    *   [x] `schema.prisma` created containing relational models for `User`, `Schedule`, `TimeLimit`, and `UsageLog`.
+    *   [x] Cascading deletes (`onDelete: Cascade`) enforced on all relational user models to prevent orphan row memory leaks.
+    *   [x] Initial migration successfully applied to the local PostgreSQL instance via `prisma migrate dev`.
 *   **Status:**
-    - [ ] Code Complete
-    - [ ] Test/Compliance Checked
+    - [x] Code Complete
+    - [x] Test/Compliance Checked
 
 ### Issue #5: Auth.js Authentication & Secure Middleware Guarding
 *   **Description:** Integrate enterprise-grade OAuth session handling and network-edge route blocking.
