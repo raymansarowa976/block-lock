@@ -66,22 +66,22 @@
 ### Issue #7: Database Server Actions & Transactional Mutators
 *   **Description:** Implement backend business logic routes handling UI mutations safely.
 *   **Acceptance Criteria:**
-    *   [ ] Next.js Server Actions created to handle creation/deletion of block schedules.
-    *   [ ] Data arrays pass through Zod validations on the server before mutating database entries.
-    *   [ ] Write blocks are enveloped within an atomic Prisma `$transaction` pipeline.
+    *   [x] Next.js Server Actions created to handle creation/deletion of block schedules.
+    *   [x] Data arrays pass through Zod validations on the server before mutating database entries.
+    *   [x] Write blocks are enveloped within an atomic Prisma `$transaction` pipeline.
 *   **Status:**
-    - [ ] Code Complete
-    - [ ] Test/Compliance Checked
+    - [x] Code Complete
+    - [x] Test/Compliance Checked
 
 ### Issue #8: Next.js Frontend Dashboard Interface
 *   **Description:** Assemble the administration web panel using modern accessible UI layers.
 *   **Acceptance Criteria:**
-    *   [ ] Fully styled `/dashboard` page built utilizing `shadcn/ui` design primitives.
-    *   [ ] Interactive React Hook Forms managing inputs dynamically with embedded loading indicators.
-    *   [ ] Global nested **React Error Boundaries** configured to catch interface failures gracefully without throwing white screens.
+    *   [x] Fully styled `/dashboard` page built utilizing `shadcn/ui` design primitives.
+    *   [x] Interactive React Hook Forms managing inputs dynamically with embedded loading indicators.
+    *   [x] Global nested **React Error Boundaries** configured to catch interface failures gracefully without throwing white screens.
 *   **Status:**
-    - [ ] Code Complete
-    - [ ] Test/Compliance Checked
+    - [x] Code Complete
+    - [x] Test/Compliance Checked
 
 ---
 
