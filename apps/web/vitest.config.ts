@@ -6,11 +6,10 @@ export default defineConfig({
   plugins: [react()],
   test: {
     globals: true,
+    environment: "jsdom",
     setupFiles: ["__tests__/setup.ts"],
     environmentMatchGlobs: [
-      ["__tests__/actions/**", "node"],
-      ["__tests__/components/**", "jsdom"],
-      ["__tests__/pages/**", "jsdom"],
+      ["**/__tests__/actions/**", "node"],
     ],
     coverage: {
       provider: "v8",

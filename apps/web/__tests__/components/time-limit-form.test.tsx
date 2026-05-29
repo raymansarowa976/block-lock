@@ -55,7 +55,9 @@ describe("TimeLimitForm", () => {
     render(<TimeLimitForm />)
     await userEvent.type(screen.getByLabelText(/domain/i), "example.com")
     await userEvent.click(screen.getByRole("button", { name: /add/i }))
-    expect(screen.getByRole("button", { name: /add/i })).toBeDisabled()
+    await waitFor(() =>
+      expect(screen.getByRole("button", { name: /add/i })).toBeDisabled(),
+    )
   })
 
   it("shows a loading indicator while the action is pending", async () => {
@@ -65,7 +67,9 @@ describe("TimeLimitForm", () => {
     render(<TimeLimitForm />)
     await userEvent.type(screen.getByLabelText(/domain/i), "example.com")
     await userEvent.click(screen.getByRole("button", { name: /add/i }))
-    expect(screen.getByTestId("loading-indicator")).toBeInTheDocument()
+    await waitFor(() =>
+      expect(screen.getByTestId("loading-indicator")).toBeInTheDocument(),
+    )
   })
 
   it("calls createTimeLimit with the correct data on valid submit", async () => {

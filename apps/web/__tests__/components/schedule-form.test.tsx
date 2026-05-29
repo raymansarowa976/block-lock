@@ -58,7 +58,9 @@ describe("ScheduleForm", () => {
     await userEvent.type(screen.getByLabelText(/end time/i), "17:00")
     await userEvent.click(screen.getAllByRole("checkbox")[0])
     await userEvent.click(screen.getByRole("button", { name: /save/i }))
-    expect(screen.getByRole("button", { name: /save/i })).toBeDisabled()
+    await waitFor(() =>
+      expect(screen.getByRole("button", { name: /save/i })).toBeDisabled(),
+    )
   })
 
   it("shows a loading indicator while the action is pending", async () => {
@@ -70,7 +72,9 @@ describe("ScheduleForm", () => {
     await userEvent.type(screen.getByLabelText(/end time/i), "17:00")
     await userEvent.click(screen.getAllByRole("checkbox")[0])
     await userEvent.click(screen.getByRole("button", { name: /save/i }))
-    expect(screen.getByTestId("loading-indicator")).toBeInTheDocument()
+    await waitFor(() =>
+      expect(screen.getByTestId("loading-indicator")).toBeInTheDocument(),
+    )
   })
 
   it("calls createSchedule with the correct payload on valid submit", async () => {
