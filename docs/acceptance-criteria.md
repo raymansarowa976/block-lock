@@ -46,22 +46,22 @@
 ### Issue #5: Auth.js Authentication & Secure Middleware Guarding
 *   **Description:** Integrate enterprise-grade OAuth session handling and network-edge route blocking.
 *   **Acceptance Criteria:**
-    *   [ ] Auth.js (NextAuth) handlers initialized under `/app/api/auth/[...nextauth]` with Google or GitHub providers.
-    *   [ ] Next.js edge-level `middleware.ts` intercepts all requests to `/dashboard*` and `/api/*`.
-    *   [ ] Unauthenticated requests are rejected with an explicit `401 Unauthorized` status for APIs, or redirect to `/login` for pages.
+    *   [x] Auth.js (NextAuth) handlers initialized under `/app/api/auth/[...nextauth]` with Google or GitHub providers.
+    *   [x] Next.js edge-level `middleware.ts` intercepts all requests to `/dashboard*` and `/api/*`.
+    *   [x] Unauthenticated requests are rejected with an explicit `401 Unauthorized` status for APIs, or redirect to `/login` for pages.
 *   **Status:**
-    - [ ] Code Complete
-    - [ ] Test/Compliance Checked
+    - [x] Code Complete
+    - [x] Test/Compliance Checked
 
 ### Issue #6: Centralized Validation Layer (packages/shared-types)
 *   **Description:** Build the contract validation tier to manage structural mutations between client interfaces and server boundaries.
 *   **Acceptance Criteria:**
-    *   [ ] Workspace initialized to export standalone TypeScript inference models out of **Zod schemas**.
-    *   [ ] Form configurations (Schedule creation, rule parameters) mapped explicitly to Zod primitives.
-    *   [ ] Zero instances of the JavaScript fallback runtime `any` keyword present in data schema targets.
+    *   [x] Workspace initialized to export standalone TypeScript inference models out of **Zod schemas**.
+    *   [x] Form configurations (Schedule creation, rule parameters) mapped explicitly to Zod primitives.
+    *   [x] Zero instances of the JavaScript fallback runtime `any` keyword present in data schema targets.
 *   **Status:**
-    - [ ] Code Complete
-    - [ ] Test/Compliance Checked
+    - [x] Code Complete
+    - [x] Test/Compliance Checked
 
 ### Issue #7: Database Server Actions & Transactional Mutators
 *   **Description:** Implement backend business logic routes handling UI mutations safely.
