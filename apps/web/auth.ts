@@ -9,4 +9,10 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
   // JWT strategy keeps session verification at the edge without a DB round-trip
   session: { strategy: "jwt" },
   pages: { signIn: "/login" },
+  callbacks: {
+    session({ session, token }) {
+      if (token.sub) session.user.id = token.sub
+      return session
+    },
+  },
 })
