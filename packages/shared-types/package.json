@@ -14,12 +14,17 @@
   "scripts": {
     "build": "tsc --project tsconfig.build.json",
     "dev": "tsc --project tsconfig.build.json --watch",
-    "lint": "tsc --noEmit"
+    "lint": "tsc --noEmit",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "test:coverage": "vitest run --coverage"
   },
   "dependencies": {
     "zod": "^3.25.0"
   },
   "devDependencies": {
-    "typescript": "^5"
+    "@vitest/coverage-v8": "^4.1.7",
+    "typescript": "^5",
+    "vitest": "^4.1.7"
   }
 }

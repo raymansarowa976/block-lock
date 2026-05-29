@@ -1,37 +1,110 @@
-import { z } from "zod";
+import { z } from "zod"
 
-export const BlockRuleSchema = z.object({
-  id: z.string().uuid(),
-  userId: z.string().uuid(),
-  domain: z.string().min(1),
+// ---------------------------------------------------------------------------
+// Shared primitives
+// ---------------------------------------------------------------------------
+
+const HHMMTime = z
+  .string()
+  .regex(/^\d{2}:\d{2}$/, "Expected HH:MM format")
+
+const DayOfWeek = z.number().int().min(0).max(6)
+
+const Domain = z
+  .string()
+  .min(1)
+  .regex(
+    /^(?:[a-zA-Z0-9](?:[a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?\.)+[a-zA-Z]{2,}$/,
+    "Invalid domain format",
+  )
+
+// ---------------------------------------------------------------------------
+// DB model schemas — mirror the Prisma models exactly
+// ---------------------------------------------------------------------------
+
+export const TimeLimitSchema = z.object({
+  id: z.string().cuid(),
+  userId: z.string().cuid(),
+  domain: Domain,
+  dailyLimit: z.number().int().positive().nullable(),
   isActive: z.boolean().default(true),
   createdAt: z.coerce.date(),
   updatedAt: z.coerce.date(),
-});
+})
 
-export const BlockScheduleSchema = z.object({
-  id: z.string().uuid(),
-  ruleId: z.string().uuid(),
-  startTime: z.string().regex(/^\d{2}:\d{2}$/),
-  endTime: z.string().regex(/^\d{2}:\d{2}$/),
-  daysOfWeek: z.array(z.number().int().min(0).max(6)),
-});
+export const ScheduleSchema = z.object({
+  id: z.string().cuid(),
+  timeLimitId: z.string().cuid(),
+  startTime: HHMMTime,
+  endTime: HHMMTime,
+  daysOfWeek: z.array(DayOfWeek).min(1),
+  createdAt: z.coerce.date(),
+  updatedAt: z.coerce.date(),
+})
 
+export const UsageLogSchema = z.object({
+  id: z.string().cuid(),
+  userId: z.string().cuid(),
+  timeLimitId: z.string().cuid().nullable(),
+  domain: Domain,
+  duration: z.number().int().nonnegative(),
+  blockedAt: z.coerce.date().nullable(),
+  loggedAt: z.coerce.date(),
+})
+
+// ---------------------------------------------------------------------------
+// Form / input schemas — strip server-generated fields for client forms
+// ---------------------------------------------------------------------------
+
+export const CreateTimeLimitSchema = z.object({
+  domain: Domain,
+  // null means the domain is unconditionally blocked; positive integer = minutes/day
+  dailyLimit: z.number().int().positive().nullable(),
+  isActive: z.boolean().default(true),
+})
+
+export const UpdateTimeLimitSchema = CreateTimeLimitSchema.partial()
+
+export const CreateScheduleSchema = z.object({
+  timeLimitId: z.string().cuid(),
+  startTime: HHMMTime,
+  endTime: HHMMTime,
+  daysOfWeek: z.array(DayOfWeek).min(1, "At least one day required"),
+})
+
+export const UpdateScheduleSchema = CreateScheduleSchema
+  .omit({ timeLimitId: true })
+  .partial()
+
+// ---------------------------------------------------------------------------
+// API payload schemas
+// ---------------------------------------------------------------------------
+
+// `rules` kept for chrome extension backward compatibility (payload.rules)
 export const SyncPayloadSchema = z.object({
-  userId: z.string().uuid(),
-  rules: z.array(BlockRuleSchema),
-  schedules: z.array(BlockScheduleSchema),
+  userId: z.string().cuid(),
+  rules: z.array(TimeLimitSchema),
+  schedules: z.array(ScheduleSchema),
   syncedAt: z.coerce.date(),
-});
+})
 
-export const AnalyticsEventSchema = z.object({
-  userId: z.string().uuid(),
-  domain: z.string(),
-  blockedAt: z.coerce.date(),
-  ruleId: z.string().uuid(),
-});
+export const UsageEventSchema = z.object({
+  timeLimitId: z.string().cuid().nullable(),
+  domain: Domain,
+  duration: z.number().int().nonnegative(),
+  blockedAt: z.coerce.date().nullable(),
+})
 
-export type BlockRule = z.infer<typeof BlockRuleSchema>;
-export type BlockSchedule = z.infer<typeof BlockScheduleSchema>;
-export type SyncPayload = z.infer<typeof SyncPayloadSchema>;
-export type AnalyticsEvent = z.infer<typeof AnalyticsEventSchema>;
+// ---------------------------------------------------------------------------
+// TypeScript types
+// ---------------------------------------------------------------------------
+
+export type TimeLimit = z.infer<typeof TimeLimitSchema>
+export type Schedule = z.infer<typeof ScheduleSchema>
+export type UsageLog = z.infer<typeof UsageLogSchema>
+export type CreateTimeLimit = z.infer<typeof CreateTimeLimitSchema>
+export type UpdateTimeLimit = z.infer<typeof UpdateTimeLimitSchema>
+export type CreateSchedule = z.infer<typeof CreateScheduleSchema>
+export type UpdateSchedule = z.infer<typeof UpdateScheduleSchema>
+export type SyncPayload = z.infer<typeof SyncPayloadSchema>
+export type UsageEvent = z.infer<typeof UsageEventSchema>
