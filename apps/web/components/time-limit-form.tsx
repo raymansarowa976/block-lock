@@ -12,12 +12,11 @@ import { createTimeLimit } from "@/lib/actions/time-limits"
 const FormSchema = z.object({
   domain: z
     .string()
-    .min(1, "Domain is required")
+    .min(1, "Website address is required")
     .regex(
       /^(?:[a-zA-Z0-9](?:[a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?\.)+[a-zA-Z]{2,}$/,
-      "Invalid domain format",
+      "Invalid website address",
     ),
-  // Empty input becomes null (unconditional block); a positive integer caps daily usage
   dailyLimit: z.preprocess(
     (v) => (v === "" || v == null ? null : Number(v)),
     z.number().int().positive().nullable(),
@@ -48,38 +47,56 @@ export function TimeLimitForm() {
   }
 
   return (
-    <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">
-      <div className="space-y-1">
-        <Label htmlFor="domain">Domain</Label>
-        <Input id="domain" placeholder="example.com" {...register("domain")} />
-        {errors.domain && (
-          <p className="text-sm text-destructive">{errors.domain.message}</p>
-        )}
+    <div className="rounded-xl border border-border bg-card p-6">
+      <div className="mb-5">
+        <h2 className="font-semibold">Block a Website</h2>
+        <p className="text-xs text-muted-foreground">
+          Restrict access to a website or set a daily time limit
+        </p>
       </div>
 
-      <div className="space-y-1">
-        <Label htmlFor="dailyLimit">Daily Limit (minutes)</Label>
-        <Input
-          id="dailyLimit"
-          type="number"
-          placeholder="Leave blank to block entirely"
-          {...register("dailyLimit")}
-        />
-        {errors.dailyLimit && (
-          <p className="text-sm text-destructive">{errors.dailyLimit.message}</p>
-        )}
-      </div>
+      <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">
+        <div className="space-y-1.5">
+          <Label htmlFor="domain">Website</Label>
+          <Input id="domain" placeholder="example.com" {...register("domain")} />
+          {errors.domain ? (
+            <p className="text-xs text-destructive">{errors.domain.message}</p>
+          ) : (
+            <p className="text-xs text-muted-foreground">
+              Enter the website address without https:// or www.
+            </p>
+          )}
+        </div>
 
-      <Button type="submit" disabled={isPending}>
-        {isPending && (
-          <span
-            data-testid="loading-indicator"
-            className="mr-2 h-4 w-4 animate-spin rounded-full border-2 border-current border-t-transparent"
-            aria-hidden="true"
+        <div className="space-y-1.5">
+          <Label htmlFor="dailyLimit">Daily Limit (minutes)</Label>
+          <Input
+            id="dailyLimit"
+            type="number"
+            min={1}
+            placeholder="e.g. 30"
+            {...register("dailyLimit")}
           />
-        )}
-        Add
-      </Button>
-    </form>
+          {errors.dailyLimit ? (
+            <p className="text-xs text-destructive">{errors.dailyLimit.message}</p>
+          ) : (
+            <p className="text-xs text-muted-foreground">
+              Leave blank to block the site entirely.
+            </p>
+          )}
+        </div>
+
+        <Button type="submit" disabled={isPending} className="w-full">
+          {isPending && (
+            <span
+              data-testid="loading-indicator"
+              className="mr-2 h-4 w-4 animate-spin rounded-full border-2 border-current border-t-transparent"
+              aria-hidden="true"
+            />
+          )}
+          Add Website
+        </Button>
+      </form>
+    </div>
   )
 }
