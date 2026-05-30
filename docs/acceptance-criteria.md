@@ -90,31 +90,31 @@
 ### Issue #9: Redis Rate-Limiter API Layer
 *   **Description:** Build the infrastructure protection barrier inside the sync pipeline to mitigate denial-of-service loops.
 *   **Acceptance Criteria:**
-    *   [ ] Sliding-window rate limiter utilizing Upstash or Redis commands mapped over inbound user tracking calls.
-    *   [ ] Requests breaking the standard allotment threshold are dropped instantly, throwing a `429 Too Many Requests` response.
-    *   [ ] Next.js doesn't open database connections when requests are dropped by the rate limiter.
+    *   [x] Sliding-window rate limiter utilizing Upstash or Redis commands mapped over inbound user tracking calls.
+    *   [x] Requests breaking the standard allotment threshold are dropped instantly, throwing a `429 Too Many Requests` response.
+    *   [x] Next.js doesn't open database connections when requests are dropped by the rate limiter.
 *   **Status:**
-    - [ ] Code Complete
-    - [ ] Test/Compliance Checked
+    - [x] Code Complete
+    - [x] Test/Compliance Checked
 
 ### Issue #10: Read-Aside Cache Middleware Optimization
 *   **Description:** Implement high-speed caching routes to minimize database queries during client synchronization.
 *   **Acceptance Criteria:**
-    *   [ ] Endpoint `/api/sync` checks the Redis cluster for keys patterned under `user:rules:{userId}` first.
-    *   [ ] **Cache Hit:** Content strings return immediately to the client in sub-milliseconds without firing Prisma calls.
-    *   [ ] **Cache Miss:** Next.js queries PostgreSQL via Prisma, compiles rules, updates Redis with a strict Time-To-Live (TTL), and returns data.
+    *   [x] Endpoint `/api/sync` checks the Redis cluster for keys patterned under `user:rules:{userId}` first.
+    *   [x] **Cache Hit:** Content strings return immediately to the client in sub-milliseconds without firing Prisma calls.
+    *   [x] **Cache Miss:** Next.js queries PostgreSQL via Prisma, compiles rules, updates Redis with a strict Time-To-Live (TTL), and returns data.
 *   **Status:**
-    - [ ] Code Complete
-    - [ ] Test/Compliance Checked
+    - [x] Code Complete
+    - [x] Test/Compliance Checked
 
 ### Issue #11: Cache Invalidation Real-Time Invalidation
 *   **Description:** Bind data mutations to real-time cache purging actions to prevent stale state bugs.
 *   **Acceptance Criteria:**
-    *   [ ] Any successful Prisma schedule transaction executes an asymmetric call to evict/delete the specific user's Redis entry.
-    *   [ ] Sub-workspace communication pipelines guarantee eviction runs before confirming mutations to the client web UI.
+    *   [x] Any successful Prisma schedule transaction executes an asymmetric call to evict/delete the specific user's Redis entry.
+    *   [x] Sub-workspace communication pipelines guarantee eviction runs before confirming mutations to the client web UI.
 *   **Status:**
-    - [ ] Code Complete
-    - [ ] Test/Compliance Checked
+    - [x] Code Complete
+    - [x] Test/Compliance Checked
 
 ---
 
