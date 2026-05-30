@@ -4,6 +4,7 @@ import { describe, it, expect, vi, beforeEach } from "vitest"
 import { ScheduleForm } from "@/components/schedule-form"
 
 const TIME_LIMIT_ID = "clh3q5g0o0001qmij2z3m4n5k"
+const TIME_LIMITS = [{ id: TIME_LIMIT_ID, domain: "example.com" }]
 
 vi.mock("@/lib/actions/schedules", () => ({
   createSchedule: vi.fn(),
@@ -19,28 +20,31 @@ beforeEach(() => {
 
 describe("ScheduleForm", () => {
   it("renders a start time input", () => {
-    render(<ScheduleForm timeLimitId={TIME_LIMIT_ID} />)
+    render(<ScheduleForm timeLimits={TIME_LIMITS} />)
     expect(screen.getByLabelText(/start time/i)).toBeInTheDocument()
   })
 
   it("renders an end time input", () => {
-    render(<ScheduleForm timeLimitId={TIME_LIMIT_ID} />)
+    render(<ScheduleForm timeLimits={TIME_LIMITS} />)
     expect(screen.getByLabelText(/end time/i)).toBeInTheDocument()
   })
 
-  it("renders day-of-week checkboxes for all 7 days", () => {
-    render(<ScheduleForm timeLimitId={TIME_LIMIT_ID} />)
-    const checkboxes = screen.getAllByRole("checkbox")
-    expect(checkboxes).toHaveLength(7)
+  it("renders day-of-week toggle buttons for all 7 days", () => {
+    render(<ScheduleForm timeLimits={TIME_LIMITS} />)
+    const days = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"]
+    days.forEach((day) => {
+      expect(screen.getByRole("button", { name: day })).toBeInTheDocument()
+    })
   })
 
   it("renders a submit button", () => {
-    render(<ScheduleForm timeLimitId={TIME_LIMIT_ID} />)
+    render(<ScheduleForm timeLimits={TIME_LIMITS} />)
     expect(screen.getByRole("button", { name: /save/i })).toBeInTheDocument()
   })
 
   it("shows a validation error when no days are selected on submit", async () => {
-    render(<ScheduleForm timeLimitId={TIME_LIMIT_ID} />)
+    render(<ScheduleForm timeLimits={TIME_LIMITS} />)
+    await userEvent.selectOptions(screen.getByLabelText(/website/i), TIME_LIMIT_ID)
     await userEvent.type(screen.getByLabelText(/start time/i), "09:00")
     await userEvent.type(screen.getByLabelText(/end time/i), "17:00")
     await userEvent.click(screen.getByRole("button", { name: /save/i }))
@@ -53,10 +57,11 @@ describe("ScheduleForm", () => {
     mockCreate.mockImplementation(
       () => new Promise((resolve) => setTimeout(() => resolve({ success: true, data: {} }), 200)),
     )
-    render(<ScheduleForm timeLimitId={TIME_LIMIT_ID} />)
+    render(<ScheduleForm timeLimits={TIME_LIMITS} />)
+    await userEvent.selectOptions(screen.getByLabelText(/website/i), TIME_LIMIT_ID)
     await userEvent.type(screen.getByLabelText(/start time/i), "09:00")
     await userEvent.type(screen.getByLabelText(/end time/i), "17:00")
-    await userEvent.click(screen.getAllByRole("checkbox")[0])
+    await userEvent.click(screen.getByRole("button", { name: "Sunday" }))
     await userEvent.click(screen.getByRole("button", { name: /save/i }))
     await waitFor(() =>
       expect(screen.getByRole("button", { name: /save/i })).toBeDisabled(),
@@ -67,10 +72,11 @@ describe("ScheduleForm", () => {
     mockCreate.mockImplementation(
       () => new Promise((resolve) => setTimeout(() => resolve({ success: true, data: {} }), 200)),
     )
-    render(<ScheduleForm timeLimitId={TIME_LIMIT_ID} />)
+    render(<ScheduleForm timeLimits={TIME_LIMITS} />)
+    await userEvent.selectOptions(screen.getByLabelText(/website/i), TIME_LIMIT_ID)
     await userEvent.type(screen.getByLabelText(/start time/i), "09:00")
     await userEvent.type(screen.getByLabelText(/end time/i), "17:00")
-    await userEvent.click(screen.getAllByRole("checkbox")[0])
+    await userEvent.click(screen.getByRole("button", { name: "Sunday" }))
     await userEvent.click(screen.getByRole("button", { name: /save/i }))
     await waitFor(() =>
       expect(screen.getByTestId("loading-indicator")).toBeInTheDocument(),
@@ -78,10 +84,11 @@ describe("ScheduleForm", () => {
   })
 
   it("calls createSchedule with the correct payload on valid submit", async () => {
-    render(<ScheduleForm timeLimitId={TIME_LIMIT_ID} />)
+    render(<ScheduleForm timeLimits={TIME_LIMITS} />)
+    await userEvent.selectOptions(screen.getByLabelText(/website/i), TIME_LIMIT_ID)
     await userEvent.type(screen.getByLabelText(/start time/i), "09:00")
     await userEvent.type(screen.getByLabelText(/end time/i), "17:00")
-    await userEvent.click(screen.getAllByRole("checkbox")[1]) // Monday
+    await userEvent.click(screen.getByRole("button", { name: "Monday" }))
     await userEvent.click(screen.getByRole("button", { name: /save/i }))
     await waitFor(() => {
       expect(mockCreate).toHaveBeenCalledWith(
