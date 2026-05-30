@@ -4,14 +4,14 @@ import { signIn } from "@/auth"
 export default function LoginPage() {
   return (
     <div className="flex min-h-screen flex-col items-center justify-center bg-slate-50 px-4">
-      <div className="w-full max-w-sm rounded-3xl border border-slate-200 bg-white p-10 shadow-sm">
+      <div className="w-full max-w-md rounded-3xl border border-slate-200 bg-white px-12 py-16 shadow-sm">
         <div className="mb-8 flex flex-col items-center gap-3 text-center">
-          <div className="flex size-14 items-center justify-center rounded-full bg-red-600">
-            <Shield className="size-7 text-white" />
+          <div className="flex size-20 items-center justify-center rounded-full bg-red-600">
+            <Shield className="size-10 text-white" />
           </div>
           <div>
-            <h1 className="text-2xl font-bold tracking-tight text-slate-900">Block Lock</h1>
-            <p className="mt-1 text-sm text-slate-500">Sign in to manage your focus rules</p>
+            <h1 className="text-3xl font-bold tracking-tight text-slate-900">Block Lock</h1>
+            <p className="mt-2 text-base text-slate-500">Sign in to manage your focus rules</p>
           </div>
         </div>
 
@@ -23,7 +23,7 @@ export default function LoginPage() {
         >
           <button
             type="submit"
-            className="flex w-full items-center justify-center gap-3 rounded-full border border-slate-200 bg-white px-6 py-2.5 text-sm font-medium text-slate-700 transition-all hover:bg-slate-50 hover:shadow-sm active:scale-[0.98]"
+            className="flex w-full items-center justify-center gap-3 rounded-full border border-slate-200 bg-white px-6 py-3.5 text-base font-medium text-slate-700 transition-all hover:bg-slate-50 hover:shadow-sm active:scale-[0.98]"
           >
             <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" className="h-4 w-4">
               <path d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z" fill="#4285F4"/>
