@@ -2,7 +2,7 @@
 
 import Link from "next/link"
 import { usePathname } from "next/navigation"
-import { LayoutDashboard, BarChart2, Clock, Settings, Shield } from "lucide-react"
+import { LayoutDashboard, BarChart2, Clock, Settings } from "lucide-react"
 import { cn } from "@/lib/utils"
 
 const NAV_ITEMS = [
@@ -16,25 +16,25 @@ export function DashboardSidebar() {
   const pathname = usePathname()
 
   return (
-    <aside className="flex w-14 shrink-0 flex-col items-center gap-2 border-r border-sidebar-border bg-sidebar py-4">
-      <div className="mb-4 flex size-9 items-center justify-center">
-        <Shield className="size-5 text-sidebar-primary" />
-      </div>
-      {NAV_ITEMS.map(({ href, icon: Icon, label }) => (
-        <Link
-          key={href}
-          href={href}
-          title={label}
-          className={cn(
-            "flex size-9 items-center justify-center rounded-lg transition-colors hover:bg-sidebar-accent hover:text-sidebar-accent-foreground",
-            pathname === href
-              ? "bg-sidebar-primary text-sidebar-primary-foreground"
-              : "text-sidebar-foreground/60",
-          )}
-        >
-          <Icon className="size-4" />
-        </Link>
-      ))}
+    <aside className="flex w-52 shrink-0 flex-col gap-1 border-r border-slate-200 bg-white px-3 py-4">
+      {NAV_ITEMS.map(({ href, icon: Icon, label }) => {
+        const isActive = pathname === href
+        return (
+          <Link
+            key={href}
+            href={href}
+            className={cn(
+              "flex items-center gap-3 rounded-full px-4 py-2.5 text-sm font-medium transition-colors",
+              isActive
+                ? "bg-red-50 text-red-600"
+                : "text-slate-600 hover:bg-slate-100 hover:text-slate-900",
+            )}
+          >
+            <Icon className={cn("size-5 shrink-0", isActive ? "text-red-600" : "text-slate-500")} />
+            {label}
+          </Link>
+        )
+      })}
     </aside>
   )
 }

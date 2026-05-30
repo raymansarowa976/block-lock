@@ -4,6 +4,7 @@ import { useState } from "react"
 import { useForm, Controller } from "react-hook-form"
 import { zodResolver } from "@hookform/resolvers/zod"
 import { z } from "zod"
+import { Clock, CalendarDays } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
@@ -59,21 +60,25 @@ export function ScheduleForm({ timeLimits }: ScheduleFormProps) {
   }
 
   return (
-    <div className="rounded-xl border border-border bg-card p-6">
-      <div className="mb-5">
-        <h2 className="font-semibold">Add a Schedule</h2>
-        <p className="text-xs text-muted-foreground">
-          Block a website during specific hours and days
-        </p>
+    <div className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
+      <div className="mb-5 flex items-center gap-3">
+        <div className="flex size-9 items-center justify-center rounded-full bg-red-100">
+          <Clock className="size-4 text-red-600" />
+        </div>
+        <div>
+          <h2 className="text-lg font-semibold text-slate-800">Add a Schedule</h2>
+          <p className="text-xs text-slate-500">Block a website during specific hours and days</p>
+        </div>
       </div>
 
       <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">
         <div className="space-y-1.5">
-          <Label htmlFor="timeLimitId">Website</Label>
+          <Label htmlFor="timeLimitId" className="text-slate-700">Website</Label>
           <select
             id="timeLimitId"
+            aria-label="Website"
             {...register("timeLimitId")}
-            className="h-8 w-full rounded-lg border border-input bg-background px-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-ring/50 disabled:opacity-50"
+            className="h-10 w-full rounded-full border border-slate-200 bg-white px-4 text-sm text-slate-900 transition-all focus:border-red-400 focus:outline-none focus:ring-2 focus:ring-red-100 disabled:opacity-50"
           >
             <option value="">Select a website…</option>
             {timeLimits.map((t) => (
@@ -89,14 +94,14 @@ export function ScheduleForm({ timeLimits }: ScheduleFormProps) {
 
         <div className="grid grid-cols-2 gap-3">
           <div className="space-y-1.5">
-            <Label htmlFor="startTime">Start Time</Label>
+            <Label htmlFor="startTime" className="text-slate-700">Start Time</Label>
             <Input id="startTime" type="time" {...register("startTime")} />
             {errors.startTime && (
               <p className="text-xs text-destructive">{errors.startTime.message}</p>
             )}
           </div>
           <div className="space-y-1.5">
-            <Label htmlFor="endTime">End Time</Label>
+            <Label htmlFor="endTime" className="text-slate-700">End Time</Label>
             <Input id="endTime" type="time" {...register("endTime")} />
             {errors.endTime && (
               <p className="text-xs text-destructive">{errors.endTime.message}</p>
@@ -105,7 +110,10 @@ export function ScheduleForm({ timeLimits }: ScheduleFormProps) {
         </div>
 
         <div className="space-y-1.5">
-          <Label>Days</Label>
+          <div className="flex items-center gap-1.5">
+            <CalendarDays className="size-3.5 text-slate-400" />
+            <Label className="text-slate-700">Days</Label>
+          </div>
           <Controller
             name="daysOfWeek"
             control={control}
@@ -128,10 +136,10 @@ export function ScheduleForm({ timeLimits }: ScheduleFormProps) {
                         )
                       }
                       className={cn(
-                        "flex size-8 items-center justify-center rounded-full text-xs font-medium transition-colors",
+                        "flex size-9 items-center justify-center rounded-full text-xs font-semibold transition-all duration-150",
                         isActive
-                          ? "bg-primary text-primary-foreground"
-                          : "bg-muted text-muted-foreground hover:bg-muted/70",
+                          ? "bg-red-600 text-white shadow-sm"
+                          : "bg-slate-100 text-slate-500 hover:bg-slate-200",
                       )}
                     >
                       {day.label}

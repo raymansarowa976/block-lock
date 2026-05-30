@@ -4,6 +4,7 @@ import { useState } from "react"
 import { useForm, type Resolver } from "react-hook-form"
 import { zodResolver } from "@hookform/resolvers/zod"
 import { z } from "zod"
+import { ShieldCheck } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
@@ -47,42 +48,39 @@ export function TimeLimitForm() {
   }
 
   return (
-    <div className="rounded-xl border border-border bg-card p-6">
-      <div className="mb-5">
-        <h2 className="font-semibold">Block a Website</h2>
-        <p className="text-xs text-muted-foreground">
-          Restrict access to a website or set a daily time limit
-        </p>
+    <div className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
+      <div className="mb-5 flex items-center gap-3">
+        <div className="flex size-9 items-center justify-center rounded-full bg-red-100">
+          <ShieldCheck className="size-4 text-red-600" />
+        </div>
+        <div>
+          <h2 className="text-lg font-semibold text-slate-800">Block a Website</h2>
+          <p className="text-xs text-slate-500">Restrict access or set a daily time limit</p>
+        </div>
       </div>
 
       <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">
         <div className="space-y-1.5">
-          <Label htmlFor="domain">Website</Label>
+          <Label htmlFor="domain" className="text-slate-700">Website</Label>
           <Input id="domain" placeholder="example.com" {...register("domain")} />
           {errors.domain ? (
             <p className="text-xs text-destructive">{errors.domain.message}</p>
           ) : (
-            <p className="text-xs text-muted-foreground">
-              Enter the website address without https:// or www.
-            </p>
+            <p className="text-xs text-slate-400">Enter without https:// or www.</p>
           )}
         </div>
 
         <div className="space-y-1.5">
-          <Label htmlFor="dailyLimit">Daily Limit (minutes)</Label>
+          <Label htmlFor="dailyLimit" className="text-slate-700">Daily Limit (minutes)</Label>
           <Input
             id="dailyLimit"
             type="number"
             min={1}
-            placeholder="e.g. 30"
+            placeholder="e.g. 30 — leave blank to fully block"
             {...register("dailyLimit")}
           />
-          {errors.dailyLimit ? (
+          {errors.dailyLimit && (
             <p className="text-xs text-destructive">{errors.dailyLimit.message}</p>
-          ) : (
-            <p className="text-xs text-muted-foreground">
-              Leave blank to block the site entirely.
-            </p>
           )}
         </div>
 
