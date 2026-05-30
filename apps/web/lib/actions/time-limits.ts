@@ -3,6 +3,7 @@
 import { revalidatePath } from "next/cache"
 import { auth } from "@/auth"
 import { prisma } from "@/lib/prisma"
+import { redis } from "@/lib/redis"
 import {
   CreateTimeLimitSchema,
   UpdateTimeLimitSchema,
@@ -29,6 +30,7 @@ export async function createTimeLimit(raw: unknown) {
     }),
   )
 
+  await redis.del(`user:rules:${userId}`)
   revalidatePath("/dashboard")
   return { success: true as const, data: timeLimit }
 }
@@ -48,6 +50,7 @@ export async function updateTimeLimit(id: string, raw: unknown) {
     return tx.timeLimit.update({ where: { id }, data: parsed.data })
   })
 
+  await redis.del(`user:rules:${userId}`)
   revalidatePath("/dashboard")
   return { success: true as const, data: timeLimit }
 }
@@ -62,6 +65,7 @@ export async function deleteTimeLimit(id: string) {
     await tx.timeLimit.delete({ where: { id } })
   })
 
+  await redis.del(`user:rules:${userId}`)
   revalidatePath("/dashboard")
   return { success: true as const }
 }
