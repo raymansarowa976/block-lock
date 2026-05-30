@@ -10,10 +10,19 @@ export default defineConfig({
     setupFiles: ["__tests__/setup.ts"],
     environmentMatchGlobs: [
       ["**/__tests__/actions/**", "node"],
+      ["**/__tests__/api/**", "node"],
+      ["**/__tests__/lib/**", "node"],
     ],
     coverage: {
       provider: "v8",
-      include: ["lib/actions/**", "components/**", "app/dashboard/**"],
+      include: [
+        "lib/actions/**",
+        "lib/rate-limit.ts",
+        "lib/redis.ts",
+        "components/**",
+        "app/dashboard/**",
+        "app/api/**",
+      ],
     },
   },
   resolve: {

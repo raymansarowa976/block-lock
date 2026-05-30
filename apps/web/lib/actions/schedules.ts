@@ -3,6 +3,7 @@
 import { revalidatePath } from "next/cache"
 import { auth } from "@/auth"
 import { prisma } from "@/lib/prisma"
+import { redis } from "@/lib/redis"
 import {
   CreateScheduleSchema,
   UpdateScheduleSchema,
@@ -32,6 +33,7 @@ export async function createSchedule(raw: unknown) {
     return tx.schedule.create({ data: parsed.data })
   })
 
+  await redis.del(`user:rules:${userId}`)
   revalidatePath("/dashboard")
   return { success: true as const, data: schedule }
 }
@@ -54,6 +56,7 @@ export async function updateSchedule(id: string, raw: unknown) {
     return tx.schedule.update({ where: { id }, data: parsed.data })
   })
 
+  await redis.del(`user:rules:${userId}`)
   revalidatePath("/dashboard")
   return { success: true as const, data: schedule }
 }
@@ -71,6 +74,7 @@ export async function deleteSchedule(id: string) {
     await tx.schedule.delete({ where: { id } })
   })
 
+  await redis.del(`user:rules:${userId}`)
   revalidatePath("/dashboard")
   return { success: true as const }
 }
