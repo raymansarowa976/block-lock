@@ -6,7 +6,7 @@ type StorageState = {
   authError?: string | null
 }
 
-const DASHBOARD_URL = "https://block-lock.vercel.app/login"
+const DASHBOARD_URL = `${import.meta.env.VITE_DASHBOARD_URL ?? "https://block-lock.vercel.app"}/login`
 
 export function Popup(): React.ReactElement {
   const [storage, setStorage] = useState<StorageState | null>(null)

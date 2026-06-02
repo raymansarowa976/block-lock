@@ -1,7 +1,7 @@
 import type { SyncPayload } from "@block-lock/shared-types"
 import { applyBlockRules } from "./rule-engine"
 
-const API_BASE = "https://block-lock.vercel.app/api"
+const API_BASE = import.meta.env.VITE_API_BASE ?? "https://block-lock.vercel.app/api"
 
 export const ALLOWED_ORIGINS = [
   "https://block-lock.vercel.app",
