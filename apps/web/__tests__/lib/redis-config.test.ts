@@ -3,7 +3,7 @@ import { describe, it, expect, vi, beforeEach, afterEach } from "vitest"
 
 const { mockRedisInstance, MockRedis } = vi.hoisted(() => {
   const mockRedisInstance = { get: vi.fn(), set: vi.fn(), pipeline: vi.fn() }
-  const MockRedis = vi.fn(() => mockRedisInstance)
+  const MockRedis = vi.fn(function () { return mockRedisInstance })
   return { mockRedisInstance, MockRedis }
 })
 
@@ -16,6 +16,7 @@ describe("redis client — Upstash configuration", () => {
     process.env = { ...ORIGINAL_ENV }
     vi.resetModules()
     MockRedis.mockClear()
+    delete (globalThis as unknown as { redis?: unknown }).redis
   })
 
   afterEach(() => {
@@ -51,8 +52,8 @@ describe("redis client — Upstash configuration", () => {
 
     await import("@/lib/redis")
 
-    const callArg = MockRedis.mock.calls[0]?.[0]
-    expect(typeof callArg).toBe("object")
-    expect(callArg).not.toHaveProperty("host")
+    expect(MockRedis).toHaveBeenCalledWith(
+      expect.not.objectContaining({ host: expect.anything() }),
+    )
   })
 })

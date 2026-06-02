@@ -3,7 +3,7 @@
   "version": "0.1.0",
   "private": true,
   "scripts": {
-    "build": "vite build",
+    "build": "vite build && node scripts/zip-dist.mjs",
     "dev": "vite build --watch",
     "lint": "tsc --noEmit",
     "test": "vitest run",
