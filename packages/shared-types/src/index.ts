@@ -95,6 +95,16 @@ export const UsageEventSchema = z.object({
   blockedAt: z.coerce.date().nullable(),
 })
 
+export const AnalyticsEntrySchema = z.object({
+  domain: Domain,
+  startedAt: z.number().int().nonnegative(),
+  duration: z.number().int().nonnegative(),
+})
+
+export const AnalyticsBatchSchema = z.object({
+  entries: z.array(AnalyticsEntrySchema).min(1),
+})
+
 // ---------------------------------------------------------------------------
 // TypeScript types
 // ---------------------------------------------------------------------------
@@ -108,3 +118,5 @@ export type CreateSchedule = z.infer<typeof CreateScheduleSchema>
 export type UpdateSchedule = z.infer<typeof UpdateScheduleSchema>
 export type SyncPayload = z.infer<typeof SyncPayloadSchema>
 export type UsageEvent = z.infer<typeof UsageEventSchema>
+export type AnalyticsEntry = z.infer<typeof AnalyticsEntrySchema>
+export type AnalyticsBatch = z.infer<typeof AnalyticsBatchSchema>
