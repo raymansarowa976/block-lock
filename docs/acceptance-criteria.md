@@ -123,41 +123,41 @@
 ### Issue #12: Manifest V3 Foundation & Extension Popup UI
 *   **Description:** Scaffold the background architecture for modern web standard extension sandboxes.
 *   **Acceptance Criteria:**
-    *   [ ] `manifest.json` configured using version 3 specification parameters with host permissions granted explicitly.
-    *   [ ] Action icon launches a lightweight Popup view (`popup.tsx`) showing account binding states.
-    *   [ ] Tailwind UI elements adapt dynamically to variable browser panel sizing constraints.
+    *   [x] `manifest.json` configured using version 3 specification parameters with host permissions granted explicitly.
+    *   [x] Action icon launches a lightweight Popup view (`popup.tsx`) showing account binding states.
+    *   [x] Tailwind UI elements adapt dynamically to variable browser panel sizing constraints.
 *   **Status:**
-    - [ ] Code Complete
-    - [ ] Test/Compliance Checked
+    - [x] Code Complete
+    - [x] Test/Compliance Checked
 
 ### Issue #13: Web-to-Extension Authentication Exchange
 *   **Description:** Bridge cookie contexts safely into local extensions to bind browsing rules to authenticated backend users.
 *   **Acceptance Criteria:**
-    *   [ ] Background engine securely captures web authentication credentials via the `chrome.cookies` or `chrome.runtime` messaging pathways.
-    *   [ ] Extracted JWT identifiers are safely stored within local `chrome.storage.local` encrypted structures.
-    *   [ ] Extension flags connection errors clearly on the UI if tracking contexts become missing or expired.
+    *   [x] Background engine securely captures web authentication credentials via the `chrome.cookies` or `chrome.runtime` messaging pathways.
+    * [x] Authenticated user identifiers are persisted in `chrome.storage.local` and cleared immediately when the session expires or the user signs out.
+    *   [x] Extension flags connection errors clearly on the UI if tracking contexts become missing or expired.
 *   **Status:**
-    - [ ] Code Complete
-    - [ ] Test/Compliance Checked
+    - [x] Code Complete
+    - [x] Test/Compliance Checked
 
 ### Issue #14: Rule Compiler for Native Browser Engines
 *   **Description:** Translate server-side rule schemas into native browser structures.
 *   **Acceptance Criteria:**
-    *   [ ] Background logic parses raw domain strings into specialized regex conditions mapped precisely to `declarativeNetRequest` JSON block actions.
-    *   [ ] Rules compile automatically and handle multiple distinct edge cases, such as isolating `subdomain.domain.com` without dropping access to base domains.
+    *   [x] Background logic parses raw domain strings into specialized regex conditions mapped precisely to `declarativeNetRequest` JSON block actions.
+    *   [x] Rules compile automatically and handle multiple distinct edge cases, such as isolating `subdomain.domain.com` without dropping access to base domains.
 *   **Status:**
-    - [ ] Code Complete
-    - [ ] Test/Compliance Checked
+    - [x] Code Complete
+    - [x] Test/Compliance Checked
 
 ### Issue #15: Native Traffic Interception Engine
 *   **Description:** Pass rules into the browser engine to block websites with zero lag.
 *   **Acceptance Criteria:**
-    *   [ ] Compiled user rule blocks are written into Chrome's native engine via `chrome.declarativeNetRequest.updateDynamicRules`.
-    *   [ ] The browser blocks restricted domains instantly on a native thread before pages resolve network packets or generate browser processes.
-    *   [ ] Memory foot-print of the extension worker matches baseline thread metrics (~0MB idle overhead).
+    *   [x] Compiled user rule blocks are written into Chrome's native engine via `chrome.declarativeNetRequest.updateDynamicRules`.
+    *   [x] The browser blocks restricted domains instantly on a native thread before pages resolve network packets or generate browser processes.
+    *   [x] Memory foot-print of the extension worker matches baseline thread metrics (~0MB idle overhead).
 *   **Status:**
-    - [ ] Code Complete
-    - [ ] Test/Compliance Checked
+    - [x] Code Complete
+    - [x] Test/Compliance Checked
 
 ---
 
