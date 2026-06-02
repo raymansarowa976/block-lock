@@ -44,7 +44,7 @@ describe("ScheduleForm", () => {
 
   it("shows a validation error when no days are selected on submit", async () => {
     render(<ScheduleForm timeLimits={TIME_LIMITS} />)
-    await userEvent.selectOptions(screen.getByLabelText(/website/i), TIME_LIMIT_ID)
+    await userEvent.type(screen.getByLabelText(/website/i), "example.com")
     await userEvent.type(screen.getByLabelText(/start time/i), "09:00")
     await userEvent.type(screen.getByLabelText(/end time/i), "17:00")
     await userEvent.click(screen.getByRole("button", { name: /save/i }))
@@ -58,7 +58,7 @@ describe("ScheduleForm", () => {
       () => new Promise((resolve) => setTimeout(() => resolve({ success: true, data: {} }), 200)),
     )
     render(<ScheduleForm timeLimits={TIME_LIMITS} />)
-    await userEvent.selectOptions(screen.getByLabelText(/website/i), TIME_LIMIT_ID)
+    await userEvent.type(screen.getByLabelText(/website/i), "example.com")
     await userEvent.type(screen.getByLabelText(/start time/i), "09:00")
     await userEvent.type(screen.getByLabelText(/end time/i), "17:00")
     await userEvent.click(screen.getByRole("button", { name: "Sunday" }))
@@ -73,7 +73,7 @@ describe("ScheduleForm", () => {
       () => new Promise((resolve) => setTimeout(() => resolve({ success: true, data: {} }), 200)),
     )
     render(<ScheduleForm timeLimits={TIME_LIMITS} />)
-    await userEvent.selectOptions(screen.getByLabelText(/website/i), TIME_LIMIT_ID)
+    await userEvent.type(screen.getByLabelText(/website/i), "example.com")
     await userEvent.type(screen.getByLabelText(/start time/i), "09:00")
     await userEvent.type(screen.getByLabelText(/end time/i), "17:00")
     await userEvent.click(screen.getByRole("button", { name: "Sunday" }))
@@ -85,7 +85,7 @@ describe("ScheduleForm", () => {
 
   it("calls createSchedule with the correct payload on valid submit", async () => {
     render(<ScheduleForm timeLimits={TIME_LIMITS} />)
-    await userEvent.selectOptions(screen.getByLabelText(/website/i), TIME_LIMIT_ID)
+    await userEvent.type(screen.getByLabelText(/website/i), "example.com")
     await userEvent.type(screen.getByLabelText(/start time/i), "09:00")
     await userEvent.type(screen.getByLabelText(/end time/i), "17:00")
     await userEvent.click(screen.getByRole("button", { name: "Monday" }))

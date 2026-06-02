@@ -14,6 +14,7 @@ vi.mock("@/lib/prisma", () => ({
   },
 }))
 vi.mock("next/cache", () => ({ revalidatePath: vi.fn() }))
+vi.mock("@/lib/redis", () => ({ redis: { del: vi.fn() } }))
 
 import { auth } from "@/auth"
 import { prisma } from "@/lib/prisma"
