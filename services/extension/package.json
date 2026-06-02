@@ -8,7 +8,8 @@
     "lint": "tsc --noEmit",
     "test": "vitest run",
     "test:watch": "vitest",
-    "test:coverage": "vitest run --coverage"
+    "test:coverage": "vitest run --coverage",
+    "test:e2e": "playwright test"
   },
   "dependencies": {
     "@block-lock/shared-types": "workspace:*"
@@ -24,6 +25,7 @@
     "react-dom": "^19",
     "tailwindcss": "^4",
     "typescript": "^5",
-    "vite": "^7"
+    "vite": "^7",
+    "@playwright/test": "^1"
   }
 }

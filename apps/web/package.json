@@ -16,7 +16,7 @@
     "@base-ui/react": "^1.5.0",
     "@block-lock/shared-types": "workspace:*",
     "@hookform/resolvers": "^5.4.0",
-    "@prisma/client": "^6.0.0",
+    "@prisma/client": "^7.8.0",
     "class-variance-authority": "^0.7.1",
     "clsx": "^2.1.1",
     "ioredis": "^5.11.0",
@@ -44,7 +44,7 @@
     "eslint": "^9",
     "eslint-config-next": "16.2.6",
     "jsdom": "^29.1.1",
-    "prisma": "^6.0.0",
+    "prisma": "^7.8.0",
     "tailwindcss": "^4",
     "typescript": "^5",
     "vitest": "^4.1.7"

@@ -4,7 +4,6 @@ generator client {
 
 datasource db {
   provider = "postgresql"
-  url      = env("DATABASE_URL")
 }
 
 // ---------------------------------------------------------------------------
@@ -95,6 +94,8 @@ model Schedule {
   updatedAt   DateTime @updatedAt
 
   timeLimit TimeLimit @relation(fields: [timeLimitId], references: [id], onDelete: Cascade)
+
+  @@index([timeLimitId])
 }
 
 // One record per browsing session on a tracked domain.
@@ -109,4 +110,7 @@ model UsageLog {
 
   user      User       @relation(fields: [userId], references: [id], onDelete: Cascade)
   timeLimit TimeLimit? @relation(fields: [timeLimitId], references: [id], onDelete: SetNull)
+
+  // Composite index for analytics date-range queries: WHERE userId = ? AND loggedAt >= ?
+  @@index([userId, loggedAt])
 }
