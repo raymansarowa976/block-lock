@@ -14,5 +14,8 @@
     "service_worker": "src/background.js",
     "type": "module"
   },
-  "action": {}
+  "action": {
+    "default_popup": "popup.html",
+    "default_title": "Block Lock"
+  }
 }
