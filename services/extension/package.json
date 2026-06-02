@@ -3,14 +3,27 @@
   "version": "0.1.0",
   "private": true,
   "scripts": {
-    "build": "tsc --noEmit && echo 'Extension build not yet configured'",
-    "lint": "tsc --noEmit"
+    "build": "vite build",
+    "dev": "vite build --watch",
+    "lint": "tsc --noEmit",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "test:coverage": "vitest run --coverage"
   },
   "dependencies": {
     "@block-lock/shared-types": "workspace:*"
   },
   "devDependencies": {
+    "@tailwindcss/vite": "^4",
+    "@testing-library/jest-dom": "^6",
+    "@testing-library/react": "^16",
     "@types/chrome": "^0.0.320",
-    "typescript": "^5"
+    "@vitejs/plugin-react": "^4",
+    "jsdom": "^26",
+    "react": "^19",
+    "react-dom": "^19",
+    "tailwindcss": "^4",
+    "typescript": "^5",
+    "vite": "^7"
   }
 }
