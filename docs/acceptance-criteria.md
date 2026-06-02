@@ -166,32 +166,32 @@
 ### Issue #16: Offline Analytics Accumulation Buffer
 *   **Description:** Implement low-frequency client trackers to collect browsing intervals locally.
 *   **Acceptance Criteria:**
-    *   [ ] Service worker monitors active browser tab navigation events using the `chrome.tabs` framework.
-    *   [ ] Local data accumulators increment usage metrics within a local `chrome.storage.local` array.
-    *   [ ] Individual page actions **never** trigger immediate server network calls, preventing data flood loops.
+    *   [x] Service worker monitors active browser tab navigation events using the `chrome.tabs` framework.
+    *   [x] Local data accumulators increment usage metrics within a local `chrome.storage.local` array.
+    *   [x] Individual page actions **never** trigger immediate server network calls, preventing data flood loops.
 *   **Status:**
-    - [ ] Code Complete
-    - [ ] Test/Compliance Checked
+    - [x] Code Complete
+    - [x] Test/Compliance Checked
 
 ### Issue #17: Aggregated Analytics Batch Ingestion
 *   **Description:** Build scheduled network flash procedures to stream analytics data cleanly.
 *   **Acceptance Criteria:**
-    *   [ ] background worker sets up a low-latency cron interval to flush accumulators to the server once every 5 minutes.
-    *   [ ] `/api/analytics` parses the payload against a strict Zod schema to verify data integrity.
-    *   [ ] Data arrays execute multiple writes to PostgreSQL inside a high-speed Prisma `createMany` batch operation.
+    *   [x] background worker sets up a low-latency cron interval to flush accumulators to the server once every 5 minutes.
+    *   [x] `/api/analytics` parses the payload against a strict Zod schema to verify data integrity.
+    *   [x] Data arrays execute multiple writes to PostgreSQL inside a high-speed Prisma `createMany` batch operation.
 *   **Status:**
-    - [ ] Code Complete
-    - [ ] Test/Compliance Checked
+    - [x] Code Complete
+    - [x] Test/Compliance Checked
 
 ### Issue #18: Analytics Dashboard Charts
 *   **Description:** Render raw backend analytical telemetry rows into clear dashboard data charts.
 *   **Acceptance Criteria:**
-    *   [ ] Secure `/dashboard/analytics` view built using the Next.js App router paradigm.
-    *   [ ] Time logs are parsed using Prisma aggregations to plot minute tracks cleanly across multiple timeline scopes.
-    *   [ ] Frontend graphs are rendered using `recharts` to map time saved and total browsing duration.
+    *   [x] Secure `/dashboard/analytics` view built using the Next.js App router paradigm.
+    *   [x] Time logs are parsed using Prisma aggregations to plot minute tracks cleanly across multiple timeline scopes.
+    *   [x] Frontend graphs are rendered using `recharts` to map time saved and total browsing duration.
 *   **Status:**
-    - [ ] Code Complete
-    - [ ] Test/Compliance Checked
+    - [x] Code Complete
+    - [x] Test/Compliance Checked
 
 ---
 
