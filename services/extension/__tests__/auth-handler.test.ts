@@ -17,7 +17,8 @@ const mockFetch = vi.fn()
 vi.stubGlobal("fetch", mockFetch)
 
 beforeEach(() => {
-  mockStorageGet.mockReset()
+  // chrome.storage.local.get() always resolves to an object in the real runtime
+  mockStorageGet.mockReset().mockResolvedValue({})
   mockStorageSet.mockReset().mockResolvedValue(undefined)
   mockFetch.mockReset()
 })

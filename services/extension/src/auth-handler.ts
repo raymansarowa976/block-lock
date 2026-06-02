@@ -27,7 +27,7 @@ export async function handleExternalMessage(
 
   if (message.type === "BLOCK_LOCK_AUTH") {
     await chrome.storage.local.set({ userId: message.userId, authError: null })
-    syncRules()
+    syncRules().catch(() => {})
     sendResponse({ ok: true })
     return
   }
