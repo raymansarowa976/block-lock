@@ -68,18 +68,37 @@ async function syncRules(): Promise<void> {
   await applyBlockRules(payload)
 }
 
+// Returns a clean hostname or null if the input cannot be made into a valid domain.
+function sanitiseDomain(raw: string): string | null {
+  let d = raw.trim()
+  // Strip protocol
+  d = d.replace(/^https?:\/\//i, "")
+  // Strip path, query, fragment
+  d = d.split("/")[0].split("?")[0].split("#")[0]
+  // Strip port
+  d = d.split(":")[0]
+  // Strip leading/trailing dots (handles leading-dot and FQDN trailing-dot notation)
+  d = d.replace(/^\.+|\.+$/g, "")
+
+  const VALID_DOMAIN = /^(?:[a-zA-Z0-9](?:[a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?\.)+[a-zA-Z]{2,}$/
+  return VALID_DOMAIN.test(d) ? d : null
+}
+
 async function applyBlockRules(payload: SyncPayload): Promise<void> {
-  const rules = payload.rules
+  const domains = payload.rules
     .filter((r) => r.isActive)
-    .map((r, index) => ({
-      id: index + 1,
-      priority: 1,
-      action: { type: chrome.declarativeNetRequest.RuleActionType.BLOCK },
-      condition: {
-        urlFilter: `||${r.domain}^`,
-        resourceTypes: [chrome.declarativeNetRequest.ResourceType.MAIN_FRAME],
-      },
-    }))
+    .map((r) => sanitiseDomain(r.domain))
+    .filter((d): d is string => d !== null)
+
+  const rules = domains.map((domain, index) => ({
+    id: index + 1,
+    priority: 1,
+    action: { type: chrome.declarativeNetRequest.RuleActionType.BLOCK },
+    condition: {
+      urlFilter: `||${domain}^`,
+      resourceTypes: [chrome.declarativeNetRequest.ResourceType.MAIN_FRAME],
+    },
+  }))
 
   const existing = await chrome.declarativeNetRequest.getDynamicRules()
   const existingIds = existing.map((r) => r.id)
