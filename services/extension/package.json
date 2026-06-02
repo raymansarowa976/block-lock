@@ -15,17 +15,20 @@
     "@block-lock/shared-types": "workspace:*"
   },
   "devDependencies": {
+    "@playwright/test": "^1",
     "@tailwindcss/vite": "^4",
     "@testing-library/jest-dom": "^6",
     "@testing-library/react": "^16",
+    "@types/adm-zip": "^0.5.8",
     "@types/chrome": "^0.0.320",
+    "@types/node": "^20",
     "@vitejs/plugin-react": "^4",
+    "adm-zip": "^0.5.17",
     "jsdom": "^26",
     "react": "^19",
     "react-dom": "^19",
     "tailwindcss": "^4",
     "typescript": "^5",
-    "vite": "^7",
-    "@playwright/test": "^1"
+    "vite": "^7"
   }
 }
