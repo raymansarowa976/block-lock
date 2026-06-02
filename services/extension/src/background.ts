@@ -1,4 +1,5 @@
 import type { SyncPayload } from "@block-lock/shared-types"
+import { sanitiseDomain } from "./sanitise-domain"
 
 const API_BASE = "https://block-lock.vercel.app/api"
 const SYNC_ALARM = "sync-rules"
@@ -68,21 +69,6 @@ async function syncRules(): Promise<void> {
   await applyBlockRules(payload)
 }
 
-// Returns a clean hostname or null if the input cannot be made into a valid domain.
-function sanitiseDomain(raw: string): string | null {
-  let d = raw.trim()
-  // Strip protocol
-  d = d.replace(/^https?:\/\//i, "")
-  // Strip path, query, fragment
-  d = d.split("/")[0].split("?")[0].split("#")[0]
-  // Strip port
-  d = d.split(":")[0]
-  // Strip leading/trailing dots (handles leading-dot and FQDN trailing-dot notation)
-  d = d.replace(/^\.+|\.+$/g, "")
-
-  const VALID_DOMAIN = /^(?:[a-zA-Z0-9](?:[a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?\.)+[a-zA-Z]{2,}$/
-  return VALID_DOMAIN.test(d) ? d : null
-}
 
 async function applyBlockRules(payload: SyncPayload): Promise<void> {
   const domains = payload.rules
