@@ -10,6 +10,12 @@
     "alarms"
   ],
   "host_permissions": ["<all_urls>"],
+  "externally_connectable": {
+    "matches": [
+      "https://block-lock.vercel.app/*",
+      "http://localhost:3000/*"
+    ]
+  },
   "background": {
     "service_worker": "src/background.js",
     "type": "module"

@@ -3,6 +3,7 @@ import React, { useEffect, useState } from "react"
 type StorageState = {
   userId?: string
   lastSync?: string
+  authError?: string | null
 }
 
 const DASHBOARD_URL = "https://block-lock.vercel.app/login"
@@ -11,12 +12,13 @@ export function Popup(): React.ReactElement {
   const [storage, setStorage] = useState<StorageState | null>(null)
 
   useEffect(() => {
-    chrome.storage.local.get(["userId", "lastSync"]).then((result) => {
+    chrome.storage.local.get(["userId", "lastSync", "authError"]).then((result) => {
       setStorage(result as StorageState)
     })
   }, [])
 
   const isBound = Boolean(storage?.userId)
+  const isExpired = Boolean(storage?.authError)
   const lastSync = storage?.lastSync
 
   return (
@@ -30,6 +32,21 @@ export function Popup(): React.ReactElement {
       <main>
         {storage === null ? (
           <p className="text-sm text-gray-400">Loading…</p>
+        ) : isExpired ? (
+          <div className="space-y-3">
+            <p className="text-sm font-medium text-amber-600">Session expired</p>
+            <p className="text-xs text-gray-500">
+              Your web app session has ended. Log in again to keep rules syncing.
+            </p>
+            <a
+              href={DASHBOARD_URL}
+              target="_blank"
+              rel="noreferrer"
+              className="text-sm text-blue-600 underline hover:text-blue-800"
+            >
+              Reconnect
+            </a>
+          </div>
         ) : isBound ? (
           <div className="space-y-2">
             <p className="text-sm font-medium text-green-700">Connected</p>

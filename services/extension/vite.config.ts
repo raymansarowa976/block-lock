@@ -2,26 +2,18 @@ import { defineConfig } from "vite"
 import react from "@vitejs/plugin-react"
 import tailwindcss from "@tailwindcss/vite"
 import { resolve } from "path"
-import { copyFileSync, mkdirSync } from "fs"
+import { copyFileSync } from "fs"
 
 export default defineConfig({
   plugins: [
     react(),
     tailwindcss(),
     {
-      name: "copy-extension-files",
+      name: "copy-manifest",
       closeBundle() {
-        mkdirSync(resolve(__dirname, "dist/src"), { recursive: true })
         copyFileSync(
           resolve(__dirname, "manifest.json"),
           resolve(__dirname, "dist/manifest.json"),
-        )
-        // Copy the compiled background service worker into dist so the
-        // manifest's "src/background.js" path resolves correctly when
-        // loading dist/ as an unpacked extension.
-        copyFileSync(
-          resolve(__dirname, "src/background.js"),
-          resolve(__dirname, "dist/src/background.js"),
         )
       },
     },
@@ -32,6 +24,15 @@ export default defineConfig({
     rollupOptions: {
       input: {
         popup: resolve(__dirname, "popup.html"),
+        background: resolve(__dirname, "src/background.ts"),
+      },
+      output: {
+        // background entry goes to dist/src/background.js to match the
+        // manifest's service_worker path when dist/ is loaded as an extension
+        entryFileNames: (chunk) =>
+          chunk.name === "background" ? "src/[name].js" : "assets/[name]-[hash].js",
+        chunkFileNames: "assets/[name]-[hash].js",
+        assetFileNames: "assets/[name]-[hash].[ext]",
       },
     },
   },
