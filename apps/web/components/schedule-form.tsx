@@ -24,7 +24,7 @@ const DAYS = [
 const HHMMTime = z.string().regex(/^\d{2}:\d{2}$/, "Expected HH:MM format")
 
 const FormSchema = z.object({
-  timeLimitId: z.string().min(1, "Select a website"),
+  domain: z.string().min(1, "Enter a website"),
   startTime: HHMMTime,
   endTime: HHMMTime,
   daysOfWeek: z.array(z.number().int().min(0).max(6)).min(1, "Select at least one day"),
@@ -46,15 +46,21 @@ export function ScheduleForm({ timeLimits }: ScheduleFormProps) {
     handleSubmit,
     control,
     reset,
+    setError,
     formState: { errors },
   } = useForm<FormValues>({
     resolver: zodResolver(FormSchema),
-    defaultValues: { timeLimitId: "", startTime: "", endTime: "", daysOfWeek: [] },
+    defaultValues: { domain: "", startTime: "", endTime: "", daysOfWeek: [] },
   })
 
   async function onSubmit(data: FormValues) {
+    const timeLimit = timeLimits.find((t) => t.domain === data.domain)
+    if (!timeLimit) {
+      setError("domain", { message: "Website not found in your blocked list" })
+      return
+    }
     setIsPending(true)
-    await createSchedule(data)
+    await createSchedule({ timeLimitId: timeLimit.id, startTime: data.startTime, endTime: data.endTime, daysOfWeek: data.daysOfWeek })
     setIsPending(false)
     reset()
   }
@@ -73,22 +79,21 @@ export function ScheduleForm({ timeLimits }: ScheduleFormProps) {
 
       <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">
         <div className="space-y-1.5">
-          <Label htmlFor="timeLimitId" className="text-slate-700">Website</Label>
-          <select
-            id="timeLimitId"
-            aria-label="Website"
-            {...register("timeLimitId")}
-            className="h-10 w-full rounded-full border border-slate-200 bg-white px-4 text-sm text-slate-900 transition-all focus:border-red-400 focus:outline-none focus:ring-2 focus:ring-red-100 disabled:opacity-50"
-          >
-            <option value="">Select a website…</option>
+          <Label htmlFor="domain" className="text-slate-700">Website</Label>
+          <Input
+            id="domain"
+            type="text"
+            list="timeLimits-list"
+            placeholder="e.g. youtube.com"
+            {...register("domain")}
+          />
+          <datalist id="timeLimits-list">
             {timeLimits.map((t) => (
-              <option key={t.id} value={t.id}>
-                {t.domain}
-              </option>
+              <option key={t.id} value={t.domain} />
             ))}
-          </select>
-          {errors.timeLimitId && (
-            <p className="text-xs text-destructive">{errors.timeLimitId.message}</p>
+          </datalist>
+          {errors.domain && (
+            <p className="text-xs text-destructive">{errors.domain.message}</p>
           )}
         </div>
 
