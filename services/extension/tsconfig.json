@@ -1,11 +1,11 @@
 {
   "extends": "../../tsconfig.json",
   "compilerOptions": {
-    "lib": ["esnext"],
+    "lib": ["esnext", "dom"],
     "jsx": "react-jsx",
     "outDir": "./dist",
     "noEmit": false
   },
-  "include": ["src/**/*.ts"],
+  "include": ["src/**/*.ts", "src/**/*.tsx", "__tests__/**/*.ts", "__tests__/**/*.tsx"],
   "exclude": ["node_modules", "dist"]
 }
