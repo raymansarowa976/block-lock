@@ -56,6 +56,10 @@ describe("Manifest V3 – specification compliance", () => {
   it("declares alarms permission", () => {
     expect(m.permissions).toContain("alarms")
   })
+
+  it("declares tabs permission for reading tab URLs in navigation events", () => {
+    expect(m.permissions).toContain("tabs")
+  })
 })
 
 // These tests will fail: action.default_popup is not configured yet
