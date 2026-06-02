@@ -9,7 +9,8 @@
     "test": "vitest run",
     "test:watch": "vitest",
     "test:coverage": "vitest run --coverage",
-    "test:e2e": "playwright test"
+    "test:e2e": "playwright test",
+    "test:artifacts": "vitest run __tests__/build-zip.test.ts"
   },
   "dependencies": {
     "@block-lock/shared-types": "workspace:*"
