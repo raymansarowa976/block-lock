@@ -1,7 +1,7 @@
 import { auth } from "@/auth"
 import { NextResponse } from "next/server"
 
-export default auth((req) => {
+export const proxy = auth((req) => {
   if (req.auth) return NextResponse.next()
 
   if (req.nextUrl.pathname.startsWith("/api/")) {
@@ -12,6 +12,7 @@ export default auth((req) => {
 })
 
 export const config = {
-  // Guard /dashboard/* and /api/* but leave /api/auth/* open for Auth.js itself
-  matcher: ["/dashboard/:path*", "/api/((?!auth).*)"],
+  // Guard /dashboard/* and /api/* but leave /api/auth/* open for Auth.js
+  // and /api/sync open for the extension service worker (no cookie context)
+  matcher: ["/dashboard/:path*", "/api/((?!auth|sync).*)"],
 }

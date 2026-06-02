@@ -1,27 +1,25 @@
-import { auth } from "@/auth"
 import { prisma } from "@/lib/prisma"
 import { redis } from "@/lib/redis"
 import { NextResponse } from "next/server"
 
-const CACHE_TTL_SECONDS = 300  // 5-minute TTL matches the extension's sync interval
+const CACHE_TTL_SECONDS = 300 // 5-minute TTL matches the extension's sync interval
 
 function cacheKey(userId: string) {
   return `user:rules:${userId}`
 }
 
-export async function GET(_request: Request) {
-  const session = await auth()
-  if (!session?.user?.id) {
-    return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
+export async function GET(request: Request) {
+  const { searchParams } = new URL(request.url)
+  const userId = searchParams.get("userId")
+
+  if (!userId) {
+    return NextResponse.json({ error: "Missing userId" }, { status: 400 })
   }
 
-  const userId = session.user.id
-  const key = cacheKey(userId)
-
   // ── Cache read ──────────────────────────────────────────────────────────
-  const cached = await redis.get(key)
+  const cached = await redis.get(cacheKey(userId))
   if (cached) {
-    return NextResponse.json(JSON.parse(cached))
+    return NextResponse.json(JSON.parse(cached as string))
   }
 
   // ── Cache miss: query Prisma, write back, respond ───────────────────────
@@ -37,7 +35,7 @@ export async function GET(_request: Request) {
     syncedAt: new Date(),
   }
 
-  await redis.setex(key, CACHE_TTL_SECONDS, JSON.stringify(payload))
+  await redis.setex(cacheKey(userId), CACHE_TTL_SECONDS, JSON.stringify(payload))
 
   return NextResponse.json(payload)
 }

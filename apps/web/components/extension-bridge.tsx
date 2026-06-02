@@ -3,7 +3,12 @@
 import { useEffect } from "react"
 
 type ChromeRuntime = {
-  sendMessage: (extensionId: string, message: unknown) => void
+  lastError?: { message?: string }
+  sendMessage: (
+    extensionId: string,
+    message: unknown,
+    callback: () => void,
+  ) => void
 }
 
 // chrome.runtime is only present when the Block Lock extension is installed
@@ -25,9 +30,13 @@ export function ExtensionBridge({ userId }: { userId: string }) {
     if (!runtime) return
 
     try {
-      runtime.sendMessage(extensionId, { type: "BLOCK_LOCK_AUTH", userId })
+      runtime.sendMessage(extensionId, { type: "BLOCK_LOCK_AUTH", userId }, () => {
+        // Reading lastError acknowledges it and prevents Chrome from
+        // surfacing it as an uncaught runtime error in the page
+        void runtime.lastError
+      })
     } catch {
-      // Extension is installed but not responding — ignore
+      // Extension not installed or extension ID mismatch — ignore
     }
   }, [userId])
 
