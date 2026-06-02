@@ -1,5 +1,22 @@
 // @vitest-environment node
-import { describe, it, expect, beforeEach, afterEach, vi } from "vitest"
+import { describe, it, expect, vi, beforeEach, afterEach } from "vitest"
+
+const { mockPoolInstance, MockPool, mockAdapterInstance, MockPrismaPg, MockPrismaClient } =
+  vi.hoisted(() => {
+    const mockPoolInstance = { connect: vi.fn(), end: vi.fn() }
+    const MockPool = vi.fn(function () { return mockPoolInstance })
+
+    const mockAdapterInstance = {}
+    const MockPrismaPg = vi.fn(function () { return mockAdapterInstance })
+
+    const MockPrismaClient = vi.fn(function () { return {} })
+
+    return { mockPoolInstance, MockPool, mockAdapterInstance, MockPrismaPg, MockPrismaClient }
+  })
+
+vi.mock("pg", () => ({ Pool: MockPool }))
+vi.mock("@prisma/adapter-pg", () => ({ PrismaPg: MockPrismaPg }))
+vi.mock("@prisma/client", () => ({ PrismaClient: MockPrismaClient }))
 
 describe("prisma client — production DATABASE_URL configuration", () => {
   const ORIGINAL_ENV = process.env
@@ -7,30 +24,39 @@ describe("prisma client — production DATABASE_URL configuration", () => {
   beforeEach(() => {
     process.env = { ...ORIGINAL_ENV }
     vi.resetModules()
+    MockPool.mockClear()
+    MockPrismaPg.mockClear()
+    MockPrismaClient.mockClear()
+    delete (globalThis as unknown as { prisma?: unknown }).prisma
   })
 
   afterEach(() => {
     process.env = ORIGINAL_ENV
   })
 
-  it("exports a prisma instance when DATABASE_URL is set", async () => {
+  it("creates a pg Pool with the DATABASE_URL connection string", async () => {
     process.env.DATABASE_URL = "postgresql://user:pass@localhost:5432/blocklock"
 
-    const { prisma } = await import("@/lib/prisma")
+    await import("@/lib/prisma")
 
-    expect(prisma).toBeDefined()
+    expect(MockPool).toHaveBeenCalledOnce()
+    expect(MockPool).toHaveBeenCalledWith({
+      connectionString: "postgresql://user:pass@localhost:5432/blocklock",
+    })
   })
 
-  it("prisma instance exposes $connect and $disconnect confirming it is a PrismaClient", async () => {
+  it("passes the pg Pool into PrismaPg adapter then passes adapter to PrismaClient", async () => {
     process.env.DATABASE_URL = "postgresql://user:pass@localhost:5432/blocklock"
 
-    const { prisma } = await import("@/lib/prisma")
+    await import("@/lib/prisma")
 
-    expect(typeof prisma.$connect).toBe("function")
-    expect(typeof prisma.$disconnect).toBe("function")
+    expect(MockPrismaPg).toHaveBeenCalledWith(mockPoolInstance)
+    expect(MockPrismaClient).toHaveBeenCalledWith(
+      expect.objectContaining({ adapter: mockAdapterInstance }),
+    )
   })
 
-  it("does not cache the instance on globalThis in production", async () => {
+  it("does not cache the prisma instance on globalThis in production", async () => {
     ;(process.env as Record<string, string>).NODE_ENV = "production"
     process.env.DATABASE_URL = "postgresql://user:pass@localhost:5432/blocklock"
 
