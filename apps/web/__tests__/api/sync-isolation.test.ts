@@ -6,7 +6,7 @@ import { describe, it, expect, vi, beforeEach, Mock } from "vitest"
 vi.mock("@/lib/redis", () => ({
   redis: {
     get: vi.fn(),
-    setex: vi.fn(),
+    set: vi.fn(),
   },
 }))
 vi.mock("@/lib/prisma", () => ({
@@ -20,7 +20,7 @@ import { prisma } from "@/lib/prisma"
 import { GET } from "@/app/api/sync/route"
 
 const mockGet = redis.get as unknown as Mock
-const mockSetex = redis.setex as unknown as Mock
+const mockSet = redis.set as unknown as Mock
 const mockFindMany = (
   prisma as unknown as { timeLimit: { findMany: Mock } }
 ).timeLimit.findMany
@@ -88,9 +88,9 @@ describe("/api/sync – cache hit serves Redis exclusively", () => {
     expect(mockFindMany).not.toHaveBeenCalled()
   })
 
-  it("never calls redis.setex (no cache write on a hit)", async () => {
+  it("never calls redis.set (no cache write on a hit)", async () => {
     await GET(syncRequest())
-    expect(mockSetex).not.toHaveBeenCalled()
+    expect(mockSet).not.toHaveBeenCalled()
   })
 
   it("serves the Redis payload even when Prisma would return different data", async () => {

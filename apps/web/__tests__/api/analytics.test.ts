@@ -1,6 +1,7 @@
 import { describe, it, expect, vi, beforeEach, Mock } from "vitest"
 
 vi.mock("@/auth", () => ({ auth: vi.fn() }))
+vi.mock("@/lib/redis", () => ({ redis: { del: vi.fn() } }))
 vi.mock("@/lib/prisma", () => ({
   prisma: {
     usageLog: { createMany: vi.fn() },

@@ -1,6 +1,7 @@
 import { describe, it, expect, vi, beforeEach, Mock } from "vitest"
 
 vi.mock("@/auth", () => ({ auth: vi.fn() }))
+vi.mock("@/lib/redis", () => ({ redis: { del: vi.fn() } }))
 vi.mock("@/lib/prisma", () => ({
   prisma: {
     usageLog: { findMany: vi.fn() },
@@ -9,7 +10,13 @@ vi.mock("@/lib/prisma", () => ({
 
 import { auth } from "@/auth"
 import { prisma } from "@/lib/prisma"
-import { getAnalyticsData } from "@/lib/actions/analytics"
+import { getAnalyticsData, type Scope } from "@/lib/actions/analytics"
+
+async function getSuccess(scope: Scope) {
+  const result = await getAnalyticsData(scope)
+  if (!result.success) throw new Error(result.error)
+  return result
+}
 
 const mockAuth = auth as unknown as Mock
 const mockFindMany = (
@@ -46,6 +53,7 @@ describe("getAnalyticsData – authentication", () => {
     mockAuth.mockResolvedValue(null)
     const result = await getAnalyticsData("week")
     expect(result.success).toBe(false)
+    if (result.success) throw new Error("Expected failure")
     expect(result.error).toBeDefined()
   })
 
@@ -122,20 +130,20 @@ describe("getAnalyticsData – result shape", () => {
 
   it("returns success: true with a data array on a valid call", async () => {
     mockFindMany.mockResolvedValue([makeLog()])
-    const result = await getAnalyticsData("week")
+    const result = await getSuccess("week")
     expect(result.success).toBe(true)
     expect(Array.isArray(result.data)).toBe(true)
   })
 
   it("returns an empty data array when there are no usage logs", async () => {
-    const result = await getAnalyticsData("week")
+    const result = await getSuccess("week")
     expect(result.data).toEqual([])
   })
 
   it("each data point has a date string, totalMinutes, and savedMinutes", async () => {
     mockFindMany.mockResolvedValue([makeLog()])
-    const result = await getAnalyticsData("week")
-    const point = result.data![0]
+    const result = await getSuccess("week")
+    const point = result.data[0]
     expect(typeof point.date).toBe("string")
     expect(typeof point.totalMinutes).toBe("number")
     expect(typeof point.savedMinutes).toBe("number")
@@ -156,8 +164,8 @@ describe("getAnalyticsData – date grouping", () => {
       makeLog({ loggedAt: new Date("2026-05-01T09:00:00Z") }),
       makeLog({ loggedAt: new Date("2026-05-01T15:00:00Z") }),
     ])
-    const result = await getAnalyticsData("week")
-    const may1Points = result.data!.filter((p) => p.date.startsWith("2026-05-01"))
+    const result = await getSuccess("week")
+    const may1Points = result.data.filter((p) => p.date.startsWith("2026-05-01"))
     expect(may1Points).toHaveLength(1)
   })
 
@@ -166,7 +174,7 @@ describe("getAnalyticsData – date grouping", () => {
       makeLog({ loggedAt: new Date("2026-05-01T10:00:00Z") }),
       makeLog({ loggedAt: new Date("2026-05-02T10:00:00Z") }),
     ])
-    const result = await getAnalyticsData("week")
+    const result = await getSuccess("week")
     expect(result.data).toHaveLength(2)
   })
 })
@@ -182,8 +190,8 @@ describe("getAnalyticsData – totalMinutes", () => {
 
   it("converts duration from seconds to minutes", async () => {
     mockFindMany.mockResolvedValue([makeLog({ duration: 3600 })])
-    const result = await getAnalyticsData("week")
-    expect(result.data![0].totalMinutes).toBe(60)
+    const result = await getSuccess("week")
+    expect(result.data[0].totalMinutes).toBe(60)
   })
 
   it("sums durations across all logs on the same day", async () => {
@@ -191,8 +199,8 @@ describe("getAnalyticsData – totalMinutes", () => {
       makeLog({ loggedAt: new Date("2026-05-01T09:00:00Z"), duration: 1800 }), // 30 min
       makeLog({ loggedAt: new Date("2026-05-01T14:00:00Z"), duration: 900 }),  // 15 min
     ])
-    const result = await getAnalyticsData("week")
-    expect(result.data![0].totalMinutes).toBe(45)
+    const result = await getSuccess("week")
+    expect(result.data[0].totalMinutes).toBe(45)
   })
 })
 
@@ -209,16 +217,16 @@ describe("getAnalyticsData – savedMinutes", () => {
     mockFindMany.mockResolvedValue([
       makeLog({ duration: 1200, blockedAt: new Date() }), // 20 min blocked
     ])
-    const result = await getAnalyticsData("week")
-    expect(result.data![0].savedMinutes).toBe(20)
+    const result = await getSuccess("week")
+    expect(result.data[0].savedMinutes).toBe(20)
   })
 
   it("does not count unblocked visits in savedMinutes", async () => {
     mockFindMany.mockResolvedValue([
       makeLog({ duration: 1200, blockedAt: null }),
     ])
-    const result = await getAnalyticsData("week")
-    expect(result.data![0].savedMinutes).toBe(0)
+    const result = await getSuccess("week")
+    expect(result.data[0].savedMinutes).toBe(0)
   })
 
   it("correctly partitions blocked and unblocked duration on the same day", async () => {
@@ -226,8 +234,8 @@ describe("getAnalyticsData – savedMinutes", () => {
       makeLog({ loggedAt: new Date("2026-05-01T09:00:00Z"), duration: 1800, blockedAt: new Date() }), // 30 min saved
       makeLog({ loggedAt: new Date("2026-05-01T14:00:00Z"), duration: 3600, blockedAt: null }),        // 60 min not saved
     ])
-    const result = await getAnalyticsData("week")
-    const point = result.data![0]
+    const result = await getSuccess("week")
+    const point = result.data[0]
     expect(point.totalMinutes).toBe(90)
     expect(point.savedMinutes).toBe(30)
   })

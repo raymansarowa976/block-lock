@@ -3,7 +3,7 @@ import { describe, it, expect, vi, beforeEach, Mock } from "vitest"
 vi.mock("@/lib/redis", () => ({
   redis: {
     get: vi.fn(),
-    setex: vi.fn(),
+    set: vi.fn(),
   },
 }))
 vi.mock("@/lib/prisma", () => ({
@@ -17,7 +17,7 @@ import { prisma } from "@/lib/prisma"
 import { GET } from "@/app/api/sync/route"
 
 const mockGet = redis.get as unknown as Mock
-const mockSetex = redis.setex as unknown as Mock
+const mockSet = redis.set as unknown as Mock
 const mockFindMany = (
   prisma as unknown as { timeLimit: { findMany: Mock } }
 ).timeLimit.findMany
@@ -117,10 +117,10 @@ describe("GET /api/sync", () => {
       expect(mockFindMany).not.toHaveBeenCalled()
     })
 
-    it("does not call Redis setex on a cache hit", async () => {
+    it("does not call Redis set on a cache hit", async () => {
       mockGet.mockResolvedValue(CACHED_PAYLOAD)
       await GET(syncRequest(USER_ID))
-      expect(mockSetex).not.toHaveBeenCalled()
+      expect(mockSet).not.toHaveBeenCalled()
     })
 
     it("returns the cached payload content verbatim", async () => {
@@ -173,20 +173,20 @@ describe("GET /api/sync", () => {
     it("writes the compiled payload to Redis after a cache miss", async () => {
       mockFindMany.mockResolvedValue([makeTimeLimit()])
       await GET(syncRequest(USER_ID))
-      expect(mockSetex).toHaveBeenCalledOnce()
+      expect(mockSet).toHaveBeenCalledOnce()
     })
 
     it("writes under the user:rules:{userId} key pattern", async () => {
       mockFindMany.mockResolvedValue([makeTimeLimit()])
       await GET(syncRequest(USER_ID))
-      const [key] = mockSetex.mock.calls[0]
+      const [key] = mockSet.mock.calls[0]
       expect(key).toBe(CACHE_KEY)
     })
 
     it("writes with a positive integer TTL in seconds", async () => {
       mockFindMany.mockResolvedValue([makeTimeLimit()])
       await GET(syncRequest(USER_ID))
-      const [, ttl] = mockSetex.mock.calls[0]
+      const [, , { ex: ttl }] = mockSet.mock.calls[0]
       expect(Number.isInteger(ttl)).toBe(true)
       expect(ttl).toBeGreaterThan(0)
     })
@@ -194,14 +194,14 @@ describe("GET /api/sync", () => {
     it("writes a valid JSON string to Redis", async () => {
       mockFindMany.mockResolvedValue([makeTimeLimit()])
       await GET(syncRequest(USER_ID))
-      const [, , value] = mockSetex.mock.calls[0]
+      const [, value] = mockSet.mock.calls[0]
       expect(() => JSON.parse(value as string)).not.toThrow()
     })
 
     it("stores the userId inside the cached payload", async () => {
       mockFindMany.mockResolvedValue([makeTimeLimit()])
       await GET(syncRequest(USER_ID))
-      const cached = JSON.parse(mockSetex.mock.calls[0][2] as string)
+      const cached = JSON.parse(mockSet.mock.calls[0][1] as string)
       expect(cached.userId).toBe(USER_ID)
     })
 
