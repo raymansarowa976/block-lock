@@ -35,7 +35,7 @@ export async function GET(request: Request) {
     syncedAt: new Date(),
   }
 
-  await redis.setex(cacheKey(userId), CACHE_TTL_SECONDS, JSON.stringify(payload))
+  await redis.set(cacheKey(userId), JSON.stringify(payload), { ex: CACHE_TTL_SECONDS })
 
   return NextResponse.json(payload)
 }

@@ -1,13 +1,13 @@
-import type { SyncPayload } from "@block-lock/shared-types"
+import type { SyncPayload, TimeLimit } from "@block-lock/shared-types"
 import { sanitiseDomain } from "./sanitise-domain"
 
 export async function applyBlockRules(payload: SyncPayload): Promise<void> {
   const domains = payload.rules
-    .filter((r) => r.isActive)
-    .map((r) => sanitiseDomain(r.domain))
-    .filter((d): d is string => d !== null)
+    .filter((r: TimeLimit) => r.isActive)
+    .map((r: TimeLimit) => sanitiseDomain(r.domain))
+    .filter((d: string | null): d is string => d !== null)
 
-  const rules = domains.map((domain, index) => ({
+  const rules = domains.map((domain: string, index: number) => ({
     id: index + 1,
     priority: 1,
     action: { type: chrome.declarativeNetRequest.RuleActionType.BLOCK },

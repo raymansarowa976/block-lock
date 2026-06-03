@@ -13,6 +13,12 @@ vi.mock("@/lib/prisma", () => ({
   },
 }))
 vi.mock("next/cache", () => ({ revalidatePath: vi.fn() }))
+vi.mock("@/lib/redis", () => ({ redis: { del: vi.fn() } }))
+vi.mock("@prisma/client", () => ({
+  Prisma: {
+    PrismaClientKnownRequestError: class extends Error { code = "" },
+  },
+}))
 
 import { auth } from "@/auth"
 import { prisma } from "@/lib/prisma"
