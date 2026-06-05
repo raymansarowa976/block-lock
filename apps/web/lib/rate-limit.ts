@@ -20,15 +20,14 @@ export async function rateLimit(userId: string): Promise<RateLimitResult> {
   // Sliding window: purge entries that have aged out of the window
   pipe.zremrangebyscore(key, 0, windowStart)
   // Record this request
-  pipe.zadd(key, now, member)
+  pipe.zadd(key, { score: now, member })
   // Count all requests currently inside the window (includes this one)
   pipe.zcard(key)
   // Reset the key TTL so idle keys expire automatically
   pipe.pexpire(key, RATE_LIMIT_WINDOW_MS)
 
   const results = await pipe.exec()
-  // results[2] = [Error | null, zcard value]
-  const count = (results?.[2]?.[1] as number) ?? 0
+  const count = (results?.[2] as number) ?? 0
 
   return {
     allowed: count <= RATE_LIMIT_MAX,

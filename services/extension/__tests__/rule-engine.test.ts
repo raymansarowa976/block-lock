@@ -10,7 +10,7 @@ vi.stubGlobal("chrome", {
   declarativeNetRequest: {
     getDynamicRules: mockGetDynamicRules,
     updateDynamicRules: mockUpdateDynamicRules,
-    RuleActionType: { BLOCK: "block" },
+    RuleActionType: { BLOCK: "block", REDIRECT: "redirect" },
     ResourceType: { MAIN_FRAME: "main_frame" },
   },
   storage: {
@@ -76,10 +76,16 @@ describe("applyBlockRules – rule structure passed to updateDynamicRules", () =
     expect(addRules[0].priority).toBe(1)
   })
 
-  it("sets action type to the declarativeNetRequest BLOCK enum value", async () => {
+  it("sets action type to the declarativeNetRequest REDIRECT enum value", async () => {
     await applyBlockRules(makePayload({ rules: [makeRule("a.com")] }))
     const { addRules } = mockUpdateDynamicRules.mock.calls[0][0]
-    expect(addRules[0].action.type).toBe("block")
+    expect(addRules[0].action.type).toBe("redirect")
+  })
+
+  it("sets the redirect extensionPath to the blocked page with the domain as a query param", async () => {
+    await applyBlockRules(makePayload({ rules: [makeRule("example.com")] }))
+    const { addRules } = mockUpdateDynamicRules.mock.calls[0][0]
+    expect(addRules[0].action.redirect.extensionPath).toBe("/blocked.html?domain=example.com")
   })
 
   it("sets resourceTypes to [MAIN_FRAME]", async () => {
@@ -152,6 +158,14 @@ describe("applyBlockRules – lastSync", () => {
     await applyBlockRules(makePayload())
     expect(mockStorageSet).toHaveBeenCalledWith(
       expect.objectContaining({ lastSync: expect.any(String) }),
+    )
+  })
+
+  it("writes the rules array to storage after applying rules", async () => {
+    const rules = [makeRule("a.com")]
+    await applyBlockRules(makePayload({ rules }))
+    expect(mockStorageSet).toHaveBeenCalledWith(
+      expect.objectContaining({ rules: expect.any(Array) }),
     )
   })
 })

@@ -10,7 +10,10 @@ export async function applyBlockRules(payload: SyncPayload): Promise<void> {
   const rules = domains.map((domain: string, index: number) => ({
     id: index + 1,
     priority: 1,
-    action: { type: chrome.declarativeNetRequest.RuleActionType.BLOCK },
+    action: {
+      type: chrome.declarativeNetRequest.RuleActionType.REDIRECT,
+      redirect: { extensionPath: `/blocked.html?domain=${domain}` },
+    },
     condition: {
       urlFilter: `||${domain}^`,
       resourceTypes: [chrome.declarativeNetRequest.ResourceType.MAIN_FRAME],
@@ -25,5 +28,5 @@ export async function applyBlockRules(payload: SyncPayload): Promise<void> {
     addRules: rules,
   })
 
-  await chrome.storage.local.set({ lastSync: new Date().toISOString() })
+  await chrome.storage.local.set({ lastSync: new Date().toISOString(), rules: payload.rules })
 }

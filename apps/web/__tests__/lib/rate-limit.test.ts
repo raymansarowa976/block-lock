@@ -26,12 +26,10 @@ import { rateLimit, RATE_LIMIT_MAX, RATE_LIMIT_WINDOW_MS } from "@/lib/rate-limi
 
 const USER_ID = "clh3q5g0o0000qmij2z3m4n5k"
 
-// Pipeline exec returns [[err, val], …] — one pair per pipelined command.
+// Pipeline exec returns direct values — one per pipelined command (Upstash Redis format).
 // Expected command order: zremrangebyscore, zadd, zcard, pexpire
-function execResult(
-  zcard: number,
-): [[null, number], [null, number], [null, number], [null, number]] {
-  return [[null, 0], [null, 1], [null, zcard], [null, 1]]
+function execResult(zcard: number): [number, number, number, number] {
+  return [0, 1, zcard, 1]
 }
 
 beforeEach(() => {
