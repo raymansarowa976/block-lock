@@ -1,13 +1,13 @@
 ## Pre-Deployment Checklist — Vercel
 
 ### 1. Provision a Production PostgreSQL Database
-- [ ] Create a PostgreSQL database (Neon, Supabase, or Railway recommended for Vercel)
-- [ ] Copy the connection string — this is your `DATABASE_URL`
-- [ ] Run migrations against the production DB: `pnpm prisma migrate deploy`
+- [x] Create a PostgreSQL database (Neon, Supabase, or Railway recommended for Vercel)
+- [x] Copy the connection string — this is your `DATABASE_URL`
+- [x] Run migrations against the production DB: `pnpm prisma migrate deploy`
 
 ### 2. Provision Upstash Redis
-- [ ] Create a Redis database at [upstash.com](https://upstash.com) (or via Vercel Marketplace → Storage)
-- [ ] Copy `UPSTASH_REDIS_REST_URL` and `UPSTASH_REDIS_REST_TOKEN`
+- [x] Create a Redis database at [upstash.com](https://upstash.com) (or via Vercel Marketplace → Storage)
+- [x] Copy `UPSTASH_REDIS_REST_URL` and `UPSTASH_REDIS_REST_TOKEN`
 
 ### 3. Set Up Google OAuth
 - [ ] Go to [Google Cloud Console](https://console.cloud.google.com) → APIs & Services → Credentials
