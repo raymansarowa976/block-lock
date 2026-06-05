@@ -160,4 +160,12 @@ describe("applyBlockRules – lastSync", () => {
       expect.objectContaining({ lastSync: expect.any(String) }),
     )
   })
+
+  it("writes the rules array to storage after applying rules", async () => {
+    const rules = [makeRule("a.com")]
+    await applyBlockRules(makePayload({ rules }))
+    expect(mockStorageSet).toHaveBeenCalledWith(
+      expect.objectContaining({ rules: expect.any(Array) }),
+    )
+  })
 })

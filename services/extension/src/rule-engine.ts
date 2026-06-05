@@ -28,5 +28,5 @@ export async function applyBlockRules(payload: SyncPayload): Promise<void> {
     addRules: rules,
   })
 
-  await chrome.storage.local.set({ lastSync: new Date().toISOString() })
+  await chrome.storage.local.set({ lastSync: new Date().toISOString(), rules: payload.rules })
 }
