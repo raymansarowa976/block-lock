@@ -30,6 +30,7 @@ export async function GET(request: Request) {
 
   const payload = {
     userId,
+    // eslint-disable-next-line @typescript-eslint/no-unused-vars
     rules: timeLimits.map(({ schedules: _s, ...rule }) => rule),
     schedules: timeLimits.flatMap((tl) => tl.schedules),
     syncedAt: new Date(),
