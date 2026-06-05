@@ -20,10 +20,10 @@
 - [ ] Run `npx auth secret` (or `openssl rand -base64 32`) to generate `AUTH_SECRET`
 
 ### 5. Connect Repo to Vercel
-- [ ] Import the repository in the Vercel dashboard
-- [ ] Set **Root Directory** to `apps/web`
-- [ ] Set **Framework Preset** to Next.js
-- [ ] Set **Build Command** to `prisma generate && next build`
+- [x] Import the repository in the Vercel dashboard
+- [x] Set **Root Directory** to `apps/web`
+- [x] Set **Framework Preset** to Next.js
+- [x] Set **Build Command** to `prisma generate && next build`
 
 ### 6. Add Environment Variables in Vercel (Production)
 - [ ] `DATABASE_URL` — PostgreSQL connection string
