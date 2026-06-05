@@ -1,0 +1,35 @@
+{
+  "name": "@block-lock/extension",
+  "version": "0.1.0",
+  "private": true,
+  "scripts": {
+    "build": "vite build && node scripts/zip-dist.mjs",
+    "dev": "vite build --watch",
+    "lint": "tsc --noEmit",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "test:coverage": "vitest run --coverage",
+    "test:e2e": "playwright test",
+    "test:artifacts": "vitest run __tests__/build-zip.test.ts"
+  },
+  "dependencies": {
+    "@block-lock/shared-types": "workspace:*"
+  },
+  "devDependencies": {
+    "@playwright/test": "^1",
+    "@tailwindcss/vite": "^4",
+    "@testing-library/jest-dom": "^6",
+    "@testing-library/react": "^16",
+    "@types/adm-zip": "^0.5.8",
+    "@types/chrome": "^0.0.320",
+    "@types/node": "^20",
+    "@vitejs/plugin-react": "^4",
+    "adm-zip": "^0.5.17",
+    "jsdom": "^26",
+    "react": "^19",
+    "react-dom": "^19",
+    "tailwindcss": "^4",
+    "typescript": "^5",
+    "vite": "^7"
+  }
+}

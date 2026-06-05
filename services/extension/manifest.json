@@ -1,0 +1,28 @@
+{
+  "manifest_version": 3,
+  "name": "Block Lock",
+  "version": "0.1.0",
+  "description": "Enforce focus by blocking distracting sites via declarativeNetRequest.",
+  "permissions": [
+    "declarativeNetRequest",
+    "declarativeNetRequestFeedback",
+    "storage",
+    "alarms",
+    "tabs"
+  ],
+  "host_permissions": ["<all_urls>"],
+  "externally_connectable": {
+    "matches": [
+      "https://block-lock.vercel.app/*",
+      "http://localhost:3000/*"
+    ]
+  },
+  "background": {
+    "service_worker": "src/background.js",
+    "type": "module"
+  },
+  "action": {
+    "default_popup": "popup.html",
+    "default_title": "Block Lock"
+  }
+}

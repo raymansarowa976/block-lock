@@ -1,0 +1,30 @@
+{
+  "name": "@block-lock/shared-types",
+  "version": "0.1.0",
+  "private": true,
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "import": "./dist/index.js",
+      "require": "./dist/index.cjs",
+      "types": "./dist/index.d.ts"
+    }
+  },
+  "scripts": {
+    "build": "tsc --project tsconfig.build.json",
+    "dev": "tsc --project tsconfig.build.json --watch",
+    "lint": "tsc --noEmit",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "test:coverage": "vitest run --coverage"
+  },
+  "dependencies": {
+    "zod": "^3.25.0"
+  },
+  "devDependencies": {
+    "@vitest/coverage-v8": "^4.1.7",
+    "typescript": "^5",
+    "vitest": "^4.1.7"
+  }
+}
