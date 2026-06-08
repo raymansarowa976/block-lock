@@ -1,9 +1,11 @@
 generator client {
-  provider = "prisma-client-js"
+  provider        = "prisma-client-js"
+  previewFeatures = ["postgresqlExtensions"]
 }
 
 datasource db {
-  provider = "postgresql"
+  provider   = "postgresql"
+  extensions = [vector]
 }
 
 // ---------------------------------------------------------------------------
@@ -113,4 +115,30 @@ model UsageLog {
 
   // Composite index for analytics date-range queries: WHERE userId = ? AND loggedAt >= ?
   @@index([userId, loggedAt])
+}
+
+// ---------------------------------------------------------------------------
+// Semantic domain classification (pgvector)
+// ---------------------------------------------------------------------------
+
+// Cached 1536-dimensional embedding for a domain (text-embedding-3-small),
+// generated lazily the first time the domain is seen as "unclassified".
+// The `embedding` column is `Unsupported` because Prisma has no native vector
+// scalar type — it is written/read via raw SQL using the pgvector `vector` type.
+model DomainEmbedding {
+  id        String                  @id @default(cuid())
+  domain    String                  @unique
+  embedding Unsupported("vector(1536)")
+  createdAt DateTime                @default(now())
+  updatedAt DateTime                @updatedAt
+}
+
+// Reference embeddings for known categories of distraction (e.g. "social media",
+// "video streaming"). Unclassified domains are matched against these via
+// pgvector cosine-ranked nearest-neighbor search (`<->` on normalized vectors).
+model DistractionBaseline {
+  id        String                  @id @default(cuid())
+  label     String                  @unique
+  embedding Unsupported("vector(1536)")
+  createdAt DateTime                @default(now())
 }

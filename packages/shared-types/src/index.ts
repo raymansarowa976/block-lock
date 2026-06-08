@@ -117,6 +117,23 @@ export const UsageEventSchema = z.object({
   blockedAt: z.coerce.date().nullable(),
 })
 
+// ---------------------------------------------------------------------------
+// Semantic domain classification (pgvector)
+// ---------------------------------------------------------------------------
+
+// A domain the extension couldn't match against the user's existing rules.
+export const ClassifyDomainRequestSchema = z.object({
+  domain: Domain,
+})
+
+export const ClassifyDomainResultSchema = z.object({
+  domain: Domain,
+  matched: z.boolean(),
+  label: z.string().nullable(),
+  similarity: z.number().min(-1).max(1).nullable(),
+  blocked: z.boolean(),
+})
+
 export const AnalyticsEntrySchema = z.object({
   domain: Domain,
   startedAt: z.number().int().nonnegative(),
@@ -141,6 +158,8 @@ export type UpdateSchedule = z.infer<typeof UpdateScheduleSchema>
 export type AIScheduleBlock = z.infer<typeof AIScheduleBlockSchema>
 export type AIScheduleParseResult = z.infer<typeof AIScheduleParseResultSchema>
 export type AIScheduleParseRequest = z.infer<typeof AIScheduleParseRequestSchema>
+export type ClassifyDomainRequest = z.infer<typeof ClassifyDomainRequestSchema>
+export type ClassifyDomainResult = z.infer<typeof ClassifyDomainResultSchema>
 export type SyncPayload = z.infer<typeof SyncPayloadSchema>
 export type UsageEvent = z.infer<typeof UsageEventSchema>
 export type AnalyticsEntry = z.infer<typeof AnalyticsEntrySchema>
