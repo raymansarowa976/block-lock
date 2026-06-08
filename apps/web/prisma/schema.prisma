@@ -25,6 +25,7 @@ model User {
   sessions  Session[]
   timeLimits TimeLimit[]
   usageLogs  UsageLog[]
+  productivityInsights ProductivityInsight[]
 }
 
 model Account {
@@ -141,4 +142,24 @@ model DistractionBaseline {
   label     String                  @unique
   embedding Unsupported("vector(1536)")
   createdAt DateTime                @default(now())
+}
+
+// ---------------------------------------------------------------------------
+// AI productivity coach (trailing 7-day behavioral telemetry insights)
+// ---------------------------------------------------------------------------
+
+// One per-user markdown briefing produced by the cron-driven coach, summarizing
+// the trailing 7-day UsageLog window (focus drop patterns, micro-relapses, etc).
+model ProductivityInsight {
+  id          String   @id @default(cuid())
+  userId      String
+  periodStart DateTime
+  periodEnd   DateTime
+  summary     String   @db.Text
+  createdAt   DateTime @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  // Lookup the most recent briefing for a user: WHERE userId = ? ORDER BY createdAt DESC
+  @@index([userId, createdAt])
 }

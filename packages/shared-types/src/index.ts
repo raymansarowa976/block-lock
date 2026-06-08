@@ -145,6 +145,34 @@ export const AnalyticsBatchSchema = z.object({
 })
 
 // ---------------------------------------------------------------------------
+// AI productivity coach (trailing 7-day behavioral telemetry insights)
+// ---------------------------------------------------------------------------
+
+export const UsageDomainAggregateSchema = z.object({
+  domain: Domain,
+  totalMinutes: z.number().int().nonnegative(),
+  sessionCount: z.number().int().nonnegative(),
+  blockedCount: z.number().int().nonnegative(),
+  microRelapses: z.number().int().nonnegative(),
+})
+
+export const WeeklyUsageSummarySchema = z.object({
+  userId: z.string(),
+  periodStart: z.string().datetime(),
+  periodEnd: z.string().datetime(),
+  domains: z.array(UsageDomainAggregateSchema),
+})
+
+export const ProductivityInsightSchema = z.object({
+  id: z.string(),
+  userId: z.string(),
+  periodStart: z.coerce.date(),
+  periodEnd: z.coerce.date(),
+  summary: z.string().min(1),
+  createdAt: z.coerce.date(),
+})
+
+// ---------------------------------------------------------------------------
 // TypeScript types
 // ---------------------------------------------------------------------------
 
@@ -164,3 +192,6 @@ export type SyncPayload = z.infer<typeof SyncPayloadSchema>
 export type UsageEvent = z.infer<typeof UsageEventSchema>
 export type AnalyticsEntry = z.infer<typeof AnalyticsEntrySchema>
 export type AnalyticsBatch = z.infer<typeof AnalyticsBatchSchema>
+export type UsageDomainAggregate = z.infer<typeof UsageDomainAggregateSchema>
+export type WeeklyUsageSummary = z.infer<typeof WeeklyUsageSummarySchema>
+export type ProductivityInsight = z.infer<typeof ProductivityInsightSchema>
