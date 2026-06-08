@@ -237,22 +237,22 @@
 ### Issue #23: Vercel AI SDK Integration & Structured Output Pipeline
 *   **Description:** Integrate the Vercel AI SDK into the Next.js API layer to handle natural language scheduling requests, translating raw human intents into structured database schemas.
 *   **Acceptance Criteria:**
-    *   [ ] Next.js endpoint initialized with the `ai` SDK package and connected securely to an upstream model provider (OpenAI/Anthropic).
-    *   [ ] System prompt forces strict **Structured JSON Output** utilizing a shared Zod schema matching the relational `Schedule` parameters.
-    *   [ ] Natural language strings (e.g., *"Block social media while I work on my CS classes from 9 to 5"*) are successfully parsed into valid, array-backed block records with zero manual input.
+    *   [x] Next.js endpoint initialized with the `ai` SDK package and connected securely to an upstream model provider (OpenAI/Anthropic).
+    *   [x] System prompt forces strict **Structured JSON Output** utilizing a shared Zod schema matching the relational `Schedule` parameters.
+    *   [x] Natural language strings (e.g., *"Block social media while I work on my CS classes from 9 to 5"*) are successfully parsed into valid, array-backed block records with zero manual input.
 *   **Status:**
-    - [ ] Code Complete
-    - [ ] Test/Compliance Checked
+    - [x] Code Complete
+    - [x] Test/Compliance Checked
 
 ### Issue #24: Semantic Domain Classification Engine via pgvector
 *   **Description:** Construct an automated backend pipeline to map unknown web domains into high-dimensional vector spaces, catching evasive distraction sites through semantic similarity instead of hardcoded keyword lists.
 *   **Acceptance Criteria:**
-    *   [ ] Prisma schema updated to inject the native `pgvector` database extension into the PostgreSQL instance.
-    *   [ ] Internal API route intercepts unclassified metadata logs sent by the extension, generating a 1536-dimensional embedding using an industry-standard model (e.g., `text-embedding-3-small`).
-    *   [ ] Verification queries utilize cosine similarity mathematical operations (`<->` vector operator) to match site signatures against predefined distraction baselines, auto-blocking matches that cross an 85% confidence score.
+    *   [x] Prisma schema updated to inject the native `pgvector` database extension into the PostgreSQL instance.
+    *   [x] Internal API route intercepts unclassified metadata logs sent by the extension, generating a 1536-dimensional embedding using an industry-standard model (e.g., `text-embedding-3-small`).
+    *   [x] Verification queries utilize cosine similarity mathematical operations (`<->` vector operator) to match site signatures against predefined distraction baselines, auto-blocking matches that cross an 85% confidence score.
 *   **Status:**
-    - [ ] Code Complete
-    - [ ] Test/Compliance Checked
+    - [x] Code Complete
+    - [x] Test/Compliance Checked
 
 ### Issue #25: AI Productivity Coach & Behavioral Telemetry Aggregator
 *   **Description:** Build an asynchronous batch analyzer that looks over large historical sets of `UsageLog` data points to compile highly contextual, proactive digital wellness recommendations.
