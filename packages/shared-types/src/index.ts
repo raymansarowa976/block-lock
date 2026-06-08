@@ -77,6 +77,28 @@ export const UpdateScheduleSchema = CreateScheduleSchema
   .partial()
 
 // ---------------------------------------------------------------------------
+// AI structured-output schemas — natural language → relational block records
+// ---------------------------------------------------------------------------
+
+// One block record: a domain paired with the time window/days to block it.
+// Mirrors TimeLimit (domain) + Schedule (startTime/endTime/daysOfWeek) so the
+// API layer can create both rows directly from a single parsed record.
+export const AIScheduleBlockSchema = z.object({
+  domain: Domain,
+  startTime: HHMMTime,
+  endTime: HHMMTime,
+  daysOfWeek: z.array(DayOfWeek).min(1, "At least one day required"),
+})
+
+export const AIScheduleParseResultSchema = z.object({
+  blocks: z.array(AIScheduleBlockSchema).min(1, "At least one block required"),
+})
+
+export const AIScheduleParseRequestSchema = z.object({
+  prompt: z.string().trim().min(1).max(500),
+})
+
+// ---------------------------------------------------------------------------
 // API payload schemas
 // ---------------------------------------------------------------------------
 
@@ -116,6 +138,9 @@ export type CreateTimeLimit = z.infer<typeof CreateTimeLimitSchema>
 export type UpdateTimeLimit = z.infer<typeof UpdateTimeLimitSchema>
 export type CreateSchedule = z.infer<typeof CreateScheduleSchema>
 export type UpdateSchedule = z.infer<typeof UpdateScheduleSchema>
+export type AIScheduleBlock = z.infer<typeof AIScheduleBlockSchema>
+export type AIScheduleParseResult = z.infer<typeof AIScheduleParseResultSchema>
+export type AIScheduleParseRequest = z.infer<typeof AIScheduleParseRequestSchema>
 export type SyncPayload = z.infer<typeof SyncPayloadSchema>
 export type UsageEvent = z.infer<typeof UsageEventSchema>
 export type AnalyticsEntry = z.infer<typeof AnalyticsEntrySchema>
