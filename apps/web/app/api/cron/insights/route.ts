@@ -16,7 +16,7 @@ function isAuthorized(request: Request): boolean {
 
 export async function GET(request: Request) {
   if (!isAuthorized(request)) {
-    return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
+    return NextResponse.json({ success: false, error: "Unauthorized" }, { status: 401 })
   }
 
   const since = new Date(Date.now() - TRAILING_WINDOW_DAYS * DAY_MS)
@@ -34,6 +34,7 @@ export async function GET(request: Request) {
       if (summary.domains.length === 0) continue
 
       const markdown = await generateProductivityInsight(summary)
+      if (!markdown.trim()) continue
 
       await prisma.productivityInsight.create({
         data: {

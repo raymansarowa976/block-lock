@@ -11,13 +11,13 @@ export async function POST(request: Request) {
   const session = await auth()
   const userId = session?.user?.id
   if (!userId) {
-    return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
+    return NextResponse.json({ success: false, error: "Unauthorized" }, { status: 401 })
   }
 
   const rate = await rateLimit(userId)
   if (!rate.allowed) {
     return NextResponse.json(
-      { error: "Too many requests" },
+      { success: false, error: "Too many requests" },
       {
         status: 429,
         headers: {
@@ -32,24 +32,33 @@ export async function POST(request: Request) {
   try {
     body = await request.json()
   } catch {
-    return NextResponse.json({ error: "Invalid JSON body" }, { status: 400 })
+    return NextResponse.json({ success: false, error: "Invalid JSON body" }, { status: 400 })
   }
 
   const parsedRequest = AIScheduleParseRequestSchema.safeParse(body)
   if (!parsedRequest.success) {
-    return NextResponse.json({ error: parsedRequest.error.flatten().fieldErrors }, { status: 400 })
+    return NextResponse.json(
+      { success: false, error: parsedRequest.error.flatten().fieldErrors },
+      { status: 400 },
+    )
   }
 
   let modelOutput: unknown
   try {
     modelOutput = await parseScheduleFromPrompt(parsedRequest.data.prompt)
   } catch {
-    return NextResponse.json({ error: "Failed to reach the model provider" }, { status: 502 })
+    return NextResponse.json(
+      { success: false, error: "Failed to reach the model provider" },
+      { status: 502 },
+    )
   }
 
   const parsedResult = AIScheduleParseResultSchema.safeParse(modelOutput)
   if (!parsedResult.success) {
-    return NextResponse.json({ error: "Model returned an invalid schedule structure" }, { status: 502 })
+    return NextResponse.json(
+      { success: false, error: "Model returned an invalid schedule structure" },
+      { status: 502 },
+    )
   }
 
   const created = await prisma.$transaction(async (tx) => {
