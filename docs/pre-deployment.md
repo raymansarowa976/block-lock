@@ -35,9 +35,9 @@
 - [x] `AUTH_URL` — your production URL (e.g. `https://block-lock.vercel.app`)
 
 ### 7. Verify First Deploy
-- [ ] Trigger a deploy and confirm the build passes
-- [ ] Visit `/login` and confirm Google sign-in works end to end
-- [ ] Confirm no `PrismaClientInitializationError` in Vercel function logs
+- [x] Trigger a deploy and confirm the build passes
+- [x] Visit `/login` and confirm Google sign-in works end to end
+- [x] Confirm no `PrismaClientInitializationError` in Vercel function logs
 
 ---
 
