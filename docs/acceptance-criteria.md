@@ -272,23 +272,9 @@
     *   [x] System handles nonsensical or empty conversational strings gracefully, returning standardized payload signatures (`{ success: false, error: "..." }`) rather than running broken database operations.
 *   **Status:**
     - [x] Test/Compliance Checked
-## 🎛️ Phase 8: Advanced Workspace UI & Granular Control Centers
+## 🎛️ Phase 8: Granular Control Centers
 
-### Issue #27: Granular Schedule Profile Management Dashboard
-* **Description:** Build a dedicated `/dashboard/schedules` route allowing users to view, construct, delete, and actively toggle independent time-blocking schedule profiles.
-* **Acceptance Criteria:**
-    * [ ] Router sub-path `/dashboard/schedules` implemented with server-side page rendering via Prisma.
-    * [ ] Day-selection controls refactored from vertical checkboxes into an elegant horizontal multi-select `ToggleGroup` primitive component (mapping 'S', 'M', 'T', 'W', 'T', 'F', 'S').
-    * [ ] Each schedule item card renders a native Radix `Switch` element allowing users to toggle the `isActive` state instantly.
-    * [ ] Mutation actions (toggling state or deleting a card) invoke server actions that execute cache invalidations via Redis before refreshing the layout views.
-* **Testing & Verification Tasks:**
-    * [ ] [TEST] Build component-level tests ensuring that clicking the active toggle switch fires the correct optimized database transaction payload without full-page refreshes.
-    * [ ] [TEST] Verify that trying to save a schedule with an end time chronologically prior to its start time (e.g., 17:00 to 09:00) triggers a clear, user-facing inline validation warning.
-* **Status:**
-    - [ ] Code Complete
-    - [ ] Test/Compliance Checked
-
-### Issue #28: Multi-Tier Global Settings & Configuration Engine
+### Issue #27: Multi-Tier Global Settings & Configuration Engine
 * **Description:** Create a `/dashboard/settings` control center to manage high-level account attributes, custom default override parameters, and critical delete hooks.
 * **Acceptance Criteria:**
     * [ ] Settings page layout built using `shadcn/ui` tabs layout separating "Account Options", "Block Rules Defaults", and "Danger Zone".
@@ -300,7 +286,7 @@
     - [ ] Code Complete
     - [ ] Test/Compliance Checked
 
-### Issue #29: Time-Allowance Dynamic Limit Form Controllers
+### Issue #28: Time-Allowance Dynamic Limit Form Controllers
 * **Description:** Enhance the Domain Blocker form module to securely parse custom daily allotment allowances alongside binary block restrictions.
 * **Acceptance Criteria:**
     * [ ] The daily limit form input validates inputs using Zod, ensuring entries are either completely blank (absolute block) or an explicit positive integer representing maximum daily minutes.
@@ -312,7 +298,7 @@
     - [ ] Code Complete
     - [ ] Test/Compliance Checked
 
-### Issue #30: Real-Time UI Optimistic State Renderers
+### Issue #29: Real-Time UI Optimistic State Renderers
 * **Description:** Integrate React optimistic rendering mechanisms across forms to make user interactions feel instantaneous.
 * **Acceptance Criteria:**
     * [ ] `useOptimistic` hooks integrated over the domain removal and schedule status toggle components.
