@@ -77,6 +77,28 @@ export const UpdateScheduleSchema = CreateScheduleSchema
   .partial()
 
 // ---------------------------------------------------------------------------
+// AI structured-output schemas — natural language → relational block records
+// ---------------------------------------------------------------------------
+
+// One block record: a domain paired with the time window/days to block it.
+// Mirrors TimeLimit (domain) + Schedule (startTime/endTime/daysOfWeek) so the
+// API layer can create both rows directly from a single parsed record.
+export const AIScheduleBlockSchema = z.object({
+  domain: Domain,
+  startTime: HHMMTime,
+  endTime: HHMMTime,
+  daysOfWeek: z.array(DayOfWeek).min(1, "At least one day required"),
+})
+
+export const AIScheduleParseResultSchema = z.object({
+  blocks: z.array(AIScheduleBlockSchema).min(1, "At least one block required"),
+})
+
+export const AIScheduleParseRequestSchema = z.object({
+  prompt: z.string().trim().min(1).max(500),
+})
+
+// ---------------------------------------------------------------------------
 // API payload schemas
 // ---------------------------------------------------------------------------
 
@@ -95,6 +117,23 @@ export const UsageEventSchema = z.object({
   blockedAt: z.coerce.date().nullable(),
 })
 
+// ---------------------------------------------------------------------------
+// Semantic domain classification (pgvector)
+// ---------------------------------------------------------------------------
+
+// A domain the extension couldn't match against the user's existing rules.
+export const ClassifyDomainRequestSchema = z.object({
+  domain: Domain,
+})
+
+export const ClassifyDomainResultSchema = z.object({
+  domain: Domain,
+  matched: z.boolean(),
+  label: z.string().nullable(),
+  similarity: z.number().min(-1).max(1).nullable(),
+  blocked: z.boolean(),
+})
+
 export const AnalyticsEntrySchema = z.object({
   domain: Domain,
   startedAt: z.number().int().nonnegative(),
@@ -103,6 +142,34 @@ export const AnalyticsEntrySchema = z.object({
 
 export const AnalyticsBatchSchema = z.object({
   entries: z.array(AnalyticsEntrySchema).min(1),
+})
+
+// ---------------------------------------------------------------------------
+// AI productivity coach (trailing 7-day behavioral telemetry insights)
+// ---------------------------------------------------------------------------
+
+export const UsageDomainAggregateSchema = z.object({
+  domain: Domain,
+  totalMinutes: z.number().int().nonnegative(),
+  sessionCount: z.number().int().nonnegative(),
+  blockedCount: z.number().int().nonnegative(),
+  microRelapses: z.number().int().nonnegative(),
+})
+
+export const WeeklyUsageSummarySchema = z.object({
+  userId: z.string(),
+  periodStart: z.string().datetime(),
+  periodEnd: z.string().datetime(),
+  domains: z.array(UsageDomainAggregateSchema),
+})
+
+export const ProductivityInsightSchema = z.object({
+  id: z.string(),
+  userId: z.string(),
+  periodStart: z.coerce.date(),
+  periodEnd: z.coerce.date(),
+  summary: z.string().min(1),
+  createdAt: z.coerce.date(),
 })
 
 // ---------------------------------------------------------------------------
@@ -116,7 +183,15 @@ export type CreateTimeLimit = z.infer<typeof CreateTimeLimitSchema>
 export type UpdateTimeLimit = z.infer<typeof UpdateTimeLimitSchema>
 export type CreateSchedule = z.infer<typeof CreateScheduleSchema>
 export type UpdateSchedule = z.infer<typeof UpdateScheduleSchema>
+export type AIScheduleBlock = z.infer<typeof AIScheduleBlockSchema>
+export type AIScheduleParseResult = z.infer<typeof AIScheduleParseResultSchema>
+export type AIScheduleParseRequest = z.infer<typeof AIScheduleParseRequestSchema>
+export type ClassifyDomainRequest = z.infer<typeof ClassifyDomainRequestSchema>
+export type ClassifyDomainResult = z.infer<typeof ClassifyDomainResultSchema>
 export type SyncPayload = z.infer<typeof SyncPayloadSchema>
 export type UsageEvent = z.infer<typeof UsageEventSchema>
 export type AnalyticsEntry = z.infer<typeof AnalyticsEntrySchema>
 export type AnalyticsBatch = z.infer<typeof AnalyticsBatchSchema>
+export type UsageDomainAggregate = z.infer<typeof UsageDomainAggregateSchema>
+export type WeeklyUsageSummary = z.infer<typeof WeeklyUsageSummarySchema>
+export type ProductivityInsight = z.infer<typeof ProductivityInsightSchema>
