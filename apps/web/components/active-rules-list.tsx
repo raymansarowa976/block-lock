@@ -92,9 +92,22 @@ export function ActiveRulesList({ timeLimits }: ActiveRulesListProps) {
                     {rule.domain}
                   </span>
 
-                  <p className="pl-1 text-xs text-slate-400">
-                    {rule.dailyLimit ? `${rule.dailyLimit} min/day` : "Fully blocked"}
-                  </p>
+                  {rule.dailyLimit !== null ? (
+                    <span
+                      data-testid="status-metered"
+                      className="inline-flex items-center gap-1 rounded-full border border-amber-200 bg-amber-50 px-2 py-0.5 text-xs font-medium text-amber-700"
+                    >
+                      <Clock className="size-3" />
+                      {rule.dailyLimit} min/day
+                    </span>
+                  ) : (
+                    <span
+                      data-testid="status-blocked"
+                      className="inline-flex items-center rounded-full border border-red-200 bg-red-50 px-2 py-0.5 text-xs font-medium text-red-700"
+                    >
+                      Blocked
+                    </span>
+                  )}
 
                   {rule.schedules.length > 0 && (
                     <div className="space-y-0.5 pl-1">
