@@ -20,6 +20,7 @@ model User {
   image         String?
   createdAt     DateTime  @default(now())
   updatedAt     DateTime  @updatedAt
+  hardLockMode  Boolean   @default(false)
 
   accounts  Account[]
   sessions  Session[]

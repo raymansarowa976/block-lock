@@ -16,6 +16,39 @@ async function requireUserId(): Promise<string> {
   return session.user.id
 }
 
+function isScheduleCurrentlyActive(
+  schedules: Array<{ startTime: string; endTime: string; daysOfWeek: number[] }>,
+): boolean {
+  const now = new Date()
+  const currentDay = now.getDay()
+  const hours = String(now.getHours()).padStart(2, "0")
+  const minutes = String(now.getMinutes()).padStart(2, "0")
+  const currentTime = `${hours}:${minutes}`
+  return schedules.some(
+    (s) =>
+      s.daysOfWeek.includes(currentDay) &&
+      s.startTime <= currentTime &&
+      currentTime < s.endTime,
+  )
+}
+
+async function checkHardLock(userId: string, timeLimitId: string) {
+  const user = await prisma.user.findUnique({ where: { id: userId } })
+  if (!user?.hardLockMode) return null
+  const timeLimit = await prisma.timeLimit.findUnique({
+    where: { id: timeLimitId },
+    include: { schedules: true },
+  })
+  if (timeLimit?.isActive && isScheduleCurrentlyActive(timeLimit.schedules)) {
+    return {
+      success: false as const,
+      error:
+        "Cannot modify rules while Hard Lock Mode is active and a schedule is currently enforced",
+    }
+  }
+  return null
+}
+
 export async function createTimeLimit(raw: unknown) {
   const userId = await requireUserId().catch(() => null)
   if (!userId) return { success: false as const, error: "Unauthorized" }
@@ -53,6 +86,9 @@ export async function updateTimeLimit(id: string, raw: unknown) {
     return { success: false as const, error: parsed.error.flatten().fieldErrors }
   }
 
+  const hardLockError = await checkHardLock(userId, id)
+  if (hardLockError) return hardLockError
+
   const timeLimit = await prisma.$transaction(async (tx) => {
     const existing = await tx.timeLimit.findUnique({ where: { id } })
     if (!existing || existing.userId !== userId) throw new Error("Not found")
@@ -67,6 +103,9 @@ export async function updateTimeLimit(id: string, raw: unknown) {
 export async function deleteTimeLimit(id: string) {
   const userId = await requireUserId().catch(() => null)
   if (!userId) return { success: false as const, error: "Unauthorized" }
+
+  const hardLockError = await checkHardLock(userId, id)
+  if (hardLockError) return hardLockError
 
   await prisma.$transaction(async (tx) => {
     const existing = await tx.timeLimit.findUnique({ where: { id } })
