@@ -16,6 +16,9 @@ vi.mock("@/lib/prisma", () => ({
       update: vi.fn(),
       delete: vi.fn(),
     },
+    user: {
+      findUnique: vi.fn(),
+    },
   },
 }))
 vi.mock("next/cache", () => ({ revalidatePath: vi.fn() }))
