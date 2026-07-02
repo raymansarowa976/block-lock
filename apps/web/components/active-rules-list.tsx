@@ -5,6 +5,7 @@ import { Globe, Trash2, Clock, Pause, Play, X } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { cn } from "@/lib/utils"
 import { deleteTimeLimit, updateTimeLimit } from "@/lib/actions/time-limits"
+import { notifyExtensionRulesUpdated } from "@/components/extension-bridge"
 
 const DAY_LABELS = ["Su", "Mo", "Tu", "We", "Th", "Fr", "Sa"]
 
@@ -64,6 +65,8 @@ export function ActiveRulesList({ timeLimits }: ActiveRulesListProps) {
       if (!result.success) {
         setPendingDeletes((s) => { const n = new Set(s); n.delete(id); return n })
         setError(typeof result.error === "string" ? result.error : "Failed to delete rule")
+      } else {
+        notifyExtensionRulesUpdated()
       }
     } catch {
       setPendingDeletes((s) => { const n = new Set(s); n.delete(id); return n })
@@ -81,6 +84,8 @@ export function ActiveRulesList({ timeLimits }: ActiveRulesListProps) {
       if (!result.success) {
         setPendingToggles((s) => { const n = new Set(s); n.delete(id); return n })
         setError(typeof result.error === "string" ? result.error : "Failed to update rule")
+      } else {
+        notifyExtensionRulesUpdated()
       }
     } catch {
       setPendingToggles((s) => { const n = new Set(s); n.delete(id); return n })

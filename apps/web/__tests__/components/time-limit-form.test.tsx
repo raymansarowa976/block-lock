@@ -7,8 +7,14 @@ vi.mock("@/lib/actions/time-limits", () => ({
   createTimeLimit: vi.fn(),
 }))
 
+vi.mock("@/components/extension-bridge", () => ({
+  notifyExtensionRulesUpdated: vi.fn(),
+}))
+
 import { createTimeLimit } from "@/lib/actions/time-limits"
+import { notifyExtensionRulesUpdated } from "@/components/extension-bridge"
 const mockCreate = createTimeLimit as ReturnType<typeof vi.fn>
+const mockNotify = notifyExtensionRulesUpdated as ReturnType<typeof vi.fn>
 
 beforeEach(() => {
   vi.clearAllMocks()
@@ -91,5 +97,25 @@ describe("TimeLimitForm", () => {
     await waitFor(() => {
       expect(screen.getByLabelText(/website/i)).toHaveValue("")
     })
+  })
+
+  it("notifies the extension to re-sync after a successful submission", async () => {
+    render(<TimeLimitForm />)
+    await userEvent.type(screen.getByLabelText(/website/i), "example.com")
+    await userEvent.click(screen.getByRole("button", { name: /add/i }))
+    await waitFor(() => {
+      expect(mockNotify).toHaveBeenCalled()
+    })
+  })
+
+  it("does not notify the extension when the submission fails", async () => {
+    mockCreate.mockResolvedValue({ success: false, error: "This domain is already in your list." })
+    render(<TimeLimitForm />)
+    await userEvent.type(screen.getByLabelText(/website/i), "example.com")
+    await userEvent.click(screen.getByRole("button", { name: /add/i }))
+    await waitFor(() => {
+      expect(mockCreate).toHaveBeenCalled()
+    })
+    expect(mockNotify).not.toHaveBeenCalled()
   })
 })

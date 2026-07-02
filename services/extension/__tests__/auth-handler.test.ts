@@ -138,6 +138,59 @@ describe("handleExternalMessage – BLOCK_LOCK_SIGNOUT", () => {
   })
 })
 
+describe("handleExternalMessage – BLOCK_LOCK_RULES_UPDATED", () => {
+  const validSender = { url: "https://block-lock.vercel.app/dashboard" }
+
+  it("rejects rules-update broadcasts from disallowed origins", async () => {
+    const sendResponse = vi.fn()
+    await handleExternalMessage(
+      { type: "BLOCK_LOCK_RULES_UPDATED" },
+      { url: "https://evil.com/page" },
+      sendResponse,
+    )
+    expect(sendResponse).toHaveBeenCalledWith({ ok: false, error: "forbidden" })
+    expect(mockFetch).not.toHaveBeenCalled()
+  })
+
+  it("immediately triggers a rule re-sync instead of waiting for the next alarm", async () => {
+    mockStorageGet.mockResolvedValue({ userId: "user-abc" })
+    mockFetch.mockResolvedValue({ ok: false, status: 500 })
+    await handleExternalMessage(
+      { type: "BLOCK_LOCK_RULES_UPDATED" },
+      validSender,
+      vi.fn(),
+    )
+    expect(mockFetch).toHaveBeenCalledWith(
+      expect.stringContaining("/sync?userId=user-abc"),
+    )
+  })
+
+  it("responds with { ok: true } once the sync has been dispatched", async () => {
+    mockStorageGet.mockResolvedValue({ userId: "user-abc" })
+    mockFetch.mockResolvedValue({ ok: false, status: 500 })
+    const sendResponse = vi.fn()
+    await handleExternalMessage(
+      { type: "BLOCK_LOCK_RULES_UPDATED" },
+      validSender,
+      sendResponse,
+    )
+    expect(sendResponse).toHaveBeenCalledWith({ ok: true })
+  })
+
+  it("dispatches the sync broadcast to the background script within 200ms", async () => {
+    mockStorageGet.mockResolvedValue({ userId: "user-abc" })
+    mockFetch.mockResolvedValue({ ok: false, status: 500 })
+    const start = performance.now()
+    await handleExternalMessage(
+      { type: "BLOCK_LOCK_RULES_UPDATED" },
+      validSender,
+      vi.fn(),
+    )
+    expect(performance.now() - start).toBeLessThan(200)
+    expect(mockFetch).toHaveBeenCalled()
+  })
+})
+
 // ---------------------------------------------------------------------------
 // syncRules
 // ---------------------------------------------------------------------------

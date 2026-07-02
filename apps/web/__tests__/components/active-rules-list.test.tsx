@@ -1,4 +1,4 @@
-import { render, screen, within } from "@testing-library/react"
+import { render, screen, within, waitFor } from "@testing-library/react"
 import userEvent from "@testing-library/user-event"
 import { describe, it, expect, vi, beforeEach } from "vitest"
 import { ActiveRulesList } from "@/components/active-rules-list"
@@ -7,6 +7,16 @@ vi.mock("@/lib/actions/time-limits", () => ({
   deleteTimeLimit: vi.fn(),
   updateTimeLimit: vi.fn(),
 }))
+
+vi.mock("@/components/extension-bridge", () => ({
+  notifyExtensionRulesUpdated: vi.fn(),
+}))
+
+import { deleteTimeLimit, updateTimeLimit } from "@/lib/actions/time-limits"
+import { notifyExtensionRulesUpdated } from "@/components/extension-bridge"
+const mockDelete = deleteTimeLimit as ReturnType<typeof vi.fn>
+const mockUpdate = updateTimeLimit as ReturnType<typeof vi.fn>
+const mockNotify = notifyExtensionRulesUpdated as ReturnType<typeof vi.fn>
 
 function makeRule(overrides = {}) {
   return {
@@ -21,6 +31,8 @@ function makeRule(overrides = {}) {
 
 beforeEach(() => {
   vi.clearAllMocks()
+  mockDelete.mockResolvedValue({ success: true })
+  mockUpdate.mockResolvedValue({ success: true })
 })
 
 describe("ActiveRulesList — status markers", () => {
@@ -65,5 +77,49 @@ describe("ActiveRulesList — status markers", () => {
     const rules = [makeRule({ dailyLimit: 120 })]
     render(<ActiveRulesList timeLimits={rules} />)
     expect(screen.getByTestId("status-metered")).toHaveTextContent("120 min/day")
+  })
+})
+
+describe("ActiveRulesList — extension sync notifications", () => {
+  it("notifies the extension after successfully deleting a rule", async () => {
+    const rules = [makeRule()]
+    render(<ActiveRulesList timeLimits={rules} />)
+    await userEvent.click(screen.getByRole("button", { name: /delete example.com/i }))
+    await waitFor(() => {
+      expect(mockDelete).toHaveBeenCalled()
+    })
+    expect(mockNotify).toHaveBeenCalled()
+  })
+
+  it("does not notify the extension when deletion fails", async () => {
+    mockDelete.mockResolvedValue({ success: false, error: "boom" })
+    const rules = [makeRule()]
+    render(<ActiveRulesList timeLimits={rules} />)
+    await userEvent.click(screen.getByRole("button", { name: /delete example.com/i }))
+    await waitFor(() => {
+      expect(mockDelete).toHaveBeenCalled()
+    })
+    expect(mockNotify).not.toHaveBeenCalled()
+  })
+
+  it("notifies the extension after successfully toggling a rule", async () => {
+    const rules = [makeRule()]
+    render(<ActiveRulesList timeLimits={rules} />)
+    await userEvent.click(screen.getByRole("button", { name: /pause rule/i }))
+    await waitFor(() => {
+      expect(mockUpdate).toHaveBeenCalled()
+    })
+    expect(mockNotify).toHaveBeenCalled()
+  })
+
+  it("does not notify the extension when toggling fails", async () => {
+    mockUpdate.mockResolvedValue({ success: false, error: "boom" })
+    const rules = [makeRule()]
+    render(<ActiveRulesList timeLimits={rules} />)
+    await userEvent.click(screen.getByRole("button", { name: /pause rule/i }))
+    await waitFor(() => {
+      expect(mockUpdate).toHaveBeenCalled()
+    })
+    expect(mockNotify).not.toHaveBeenCalled()
   })
 })

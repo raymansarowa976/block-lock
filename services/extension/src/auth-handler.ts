@@ -10,7 +10,8 @@ export const ALLOWED_ORIGINS = [
 
 export type AuthMessage = { type: "BLOCK_LOCK_AUTH"; userId: string }
 export type SignoutMessage = { type: "BLOCK_LOCK_SIGNOUT" }
-export type ExtMessage = AuthMessage | SignoutMessage
+export type RulesUpdatedMessage = { type: "BLOCK_LOCK_RULES_UPDATED" }
+export type ExtMessage = AuthMessage | SignoutMessage | RulesUpdatedMessage
 
 export async function handleExternalMessage(
   message: ExtMessage,
@@ -34,6 +35,12 @@ export async function handleExternalMessage(
 
   if (message.type === "BLOCK_LOCK_SIGNOUT") {
     await chrome.storage.local.set({ userId: null, authError: null, lastSync: null })
+    sendResponse({ ok: true })
+    return
+  }
+
+  if (message.type === "BLOCK_LOCK_RULES_UPDATED") {
+    await syncRules()
     sendResponse({ ok: true })
   }
 }
