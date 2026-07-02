@@ -6,10 +6,10 @@
 * **Bug Description:** The browser extension fails to re-sync state updates with the active Chrome runtime environment.
 * **Impact:** High. Block profiles and modifications do not pull through to the local browser thread dynamically without forcing a full extension lifecycle reboot.
 * **Remedial Action Tasks:**
-    * [ ] Audit the service worker state synchronization pipeline inside `services/extension`.
-    * [ ] Force an extension-side listener hook using `chrome.runtime.onMessage` to explicitly intercept cache eviction broadcasts.
+    * [x] Audit the service worker state synchronization pipeline inside `services/extension`.
+    * [x] Force an extension-side listener hook using `chrome.runtime.onMessage` to explicitly intercept cache eviction broadcasts.
 * **Verification Pass criteria:**
-    * [ ] [TEST] Verify that changing a rule on the local environment pushes a sync broadcast to the extension background script within 200ms.
+    * [x] [TEST] Verify that changing a rule on the local environment pushes a sync broadcast to the extension background script within 200ms.
 
 ### 2. Environment Parity (Vercel Deployment Routing)
 * **Bug Description:** Extension builds are locked to local loopback addresses (`localhost`), preventing connection to the production deployed version of the application platform.
