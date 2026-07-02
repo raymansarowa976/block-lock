@@ -9,6 +9,7 @@ import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { createTimeLimit } from "@/lib/actions/time-limits"
+import { notifyExtensionRulesUpdated } from "@/components/extension-bridge"
 
 const FormSchema = z.object({
   domain: z
@@ -42,7 +43,10 @@ export function TimeLimitForm() {
 
   async function onSubmit(data: FormValues) {
     setIsPending(true)
-    await createTimeLimit(data)
+    const result = await createTimeLimit(data)
+    if (result.success) {
+      notifyExtensionRulesUpdated()
+    }
     setIsPending(false)
     reset()
   }
