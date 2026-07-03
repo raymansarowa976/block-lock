@@ -15,10 +15,10 @@
 * **Bug Description:** Extension builds are locked to local loopback addresses (`localhost`), preventing connection to the production deployed version of the application platform.
 * **Impact:** High. Real-world users installing the extension artifact are completely unauthenticated and isolated from the live backend server matrix.
 * **Remedial Action Tasks:**
-    * [ ] Abstract the API base URL parameter using an environment variable wrapper (`NEXT_PUBLIC_APP_URL`).
-    * [ ] Inject dynamic production cross-origin headers (CORS) allowing `chrome-extension://` origins to securely execute fetch queries against the `blocklock.app` domain wrapper.
+    * [x] Abstract the API base URL parameter using an environment variable wrapper (`NEXT_PUBLIC_APP_URL`).
+    * [x] Inject dynamic production cross-origin headers (CORS) allowing `chrome-extension://` origins to securely execute fetch queries against the `blocklock.app` domain wrapper.
 * **Verification Pass criteria:**
-    * [ ] [TEST] Verify that a production extension package correctly handles authentication handshakes against the deployed production API tier without throwing CORS security blocks.
+    * [x] [TEST] Verify that a production extension package correctly handles authentication handshakes against the deployed production API tier without throwing CORS security blocks.
 
 ---
 
