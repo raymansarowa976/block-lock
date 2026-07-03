@@ -14,6 +14,7 @@ type ManifestV3 = {
   version: string
   permissions: string[]
   host_permissions: string[]
+  externally_connectable?: { matches: string[] }
   background: { service_worker: string; type: string }
   action: Action
 }
@@ -60,6 +61,25 @@ describe("Manifest V3 – specification compliance", () => {
 
   it("declares tabs permission for reading tab URLs in navigation events", () => {
     expect(m.permissions).toContain("tabs")
+  })
+})
+
+describe("Manifest V3 – externally_connectable production origin", () => {
+  it("declares an externally_connectable block", () => {
+    expect(m.externally_connectable).toBeDefined()
+    expect(Array.isArray(m.externally_connectable?.matches)).toBe(true)
+  })
+
+  it("allows messages from the blocklock.app production domain", () => {
+    expect(m.externally_connectable?.matches).toContain("https://blocklock.app/*")
+  })
+
+  it("allows messages from localhost during development", () => {
+    expect(m.externally_connectable?.matches).toContain("http://localhost:3000/*")
+  })
+
+  it("does not allow messages from the retired block-lock.vercel.app domain", () => {
+    expect(m.externally_connectable?.matches).not.toContain("https://block-lock.vercel.app/*")
   })
 })
 

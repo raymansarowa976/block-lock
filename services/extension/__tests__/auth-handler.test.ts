@@ -52,10 +52,20 @@ describe("handleExternalMessage – origin validation", () => {
     const sendResponse = vi.fn()
     await handleExternalMessage(
       { type: "BLOCK_LOCK_AUTH", userId: "user-123" },
-      { url: "https://block-lock.vercel.app/dashboard" },
+      { url: "https://blocklock.app/dashboard" },
       sendResponse,
     )
     expect(sendResponse).toHaveBeenCalledWith({ ok: true })
+  })
+
+  it("rejects messages from the retired block-lock.vercel.app origin", async () => {
+    const sendResponse = vi.fn()
+    await handleExternalMessage(
+      { type: "BLOCK_LOCK_AUTH", userId: "user-123" },
+      { url: "https://block-lock.vercel.app/dashboard" },
+      sendResponse,
+    )
+    expect(sendResponse).toHaveBeenCalledWith({ ok: false, error: "forbidden" })
   })
 
   it("accepts messages from localhost during development", async () => {
@@ -71,7 +81,7 @@ describe("handleExternalMessage – origin validation", () => {
 })
 
 describe("handleExternalMessage – BLOCK_LOCK_AUTH", () => {
-  const validSender = { url: "https://block-lock.vercel.app/dashboard" }
+  const validSender = { url: "https://blocklock.app/dashboard" }
 
   it("stores userId in chrome.storage.local", async () => {
     mockStorageSet.mockResolvedValue(undefined)
@@ -110,7 +120,7 @@ describe("handleExternalMessage – BLOCK_LOCK_AUTH", () => {
 })
 
 describe("handleExternalMessage – BLOCK_LOCK_SIGNOUT", () => {
-  const validSender = { url: "https://block-lock.vercel.app/dashboard" }
+  const validSender = { url: "https://blocklock.app/dashboard" }
 
   it("clears userId, authError and lastSync from storage", async () => {
     mockStorageSet.mockResolvedValue(undefined)
@@ -139,7 +149,7 @@ describe("handleExternalMessage – BLOCK_LOCK_SIGNOUT", () => {
 })
 
 describe("handleExternalMessage – BLOCK_LOCK_RULES_UPDATED", () => {
-  const validSender = { url: "https://block-lock.vercel.app/dashboard" }
+  const validSender = { url: "https://blocklock.app/dashboard" }
 
   it("rejects rules-update broadcasts from disallowed origins", async () => {
     const sendResponse = vi.fn()
