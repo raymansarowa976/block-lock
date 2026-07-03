@@ -1,5 +1,6 @@
 import { prisma } from "@/lib/prisma"
 import { redis } from "@/lib/redis"
+import { corsHeaders, handleCorsPreflight } from "@/lib/cors"
 import { NextResponse } from "next/server"
 
 const CACHE_TTL_SECONDS = 300 // 5-minute TTL matches the extension's sync interval
@@ -8,18 +9,23 @@ function cacheKey(userId: string) {
   return `user:rules:${userId}`
 }
 
+export async function OPTIONS(request: Request) {
+  return handleCorsPreflight(request)
+}
+
 export async function GET(request: Request) {
+  const headers = corsHeaders(request.headers.get("origin")) ?? undefined
   const { searchParams } = new URL(request.url)
   const userId = searchParams.get("userId")
 
   if (!userId) {
-    return NextResponse.json({ error: "Missing userId" }, { status: 400 })
+    return NextResponse.json({ error: "Missing userId" }, { status: 400, headers })
   }
 
   // ── Cache read ──────────────────────────────────────────────────────────
   const cached = await redis.get(cacheKey(userId))
   if (cached) {
-    return NextResponse.json(JSON.parse(cached as string))
+    return NextResponse.json(JSON.parse(cached as string), { headers })
   }
 
   // ── Cache miss: query Prisma, write back, respond ───────────────────────
@@ -38,5 +44,5 @@ export async function GET(request: Request) {
 
   await redis.set(cacheKey(userId), JSON.stringify(payload), { ex: CACHE_TTL_SECONDS })
 
-  return NextResponse.json(payload)
+  return NextResponse.json(payload, { headers })
 }
