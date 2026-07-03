@@ -14,7 +14,7 @@ vi.mock("@/lib/prisma", () => ({
 
 import { redis } from "@/lib/redis"
 import { prisma } from "@/lib/prisma"
-import { GET } from "@/app/api/sync/route"
+import { GET, OPTIONS } from "@/app/api/sync/route"
 
 const mockGet = redis.get as unknown as Mock
 const mockSet = redis.set as unknown as Mock
@@ -71,15 +71,21 @@ const CACHED_PAYLOAD = JSON.stringify({
   syncedAt: "2025-01-01T00:00:00.000Z",
 })
 
-function syncRequest(userId?: string) {
+const EXTENSION_ID = "ldlmnamnojhcjjnfoodglmcnaedagljl"
+const EXTENSION_ORIGIN = `chrome-extension://${EXTENSION_ID}`
+
+function syncRequest(userId?: string, origin?: string) {
   const url = userId
     ? `http://localhost/api/sync?userId=${userId}`
     : "http://localhost/api/sync"
-  return new Request(url)
+  const headers = new Headers()
+  if (origin) headers.set("origin", origin)
+  return new Request(url, { headers })
 }
 
 beforeEach(() => {
   vi.clearAllMocks()
+  process.env.NEXT_PUBLIC_EXTENSION_ID = EXTENSION_ID
 })
 
 describe("GET /api/sync", () => {
@@ -227,6 +233,30 @@ describe("GET /api/sync", () => {
       const body = await res.json()
       expect(body.schedules).toHaveLength(1)
       expect(body.schedules[0]).toMatchObject({ timeLimitId: LIMIT_ID })
+    })
+  })
+
+  // ── CORS (chrome-extension origin) ──────────────────────────────────────────
+
+  describe("CORS – extension origin handling", () => {
+    it("echoes the extension origin in Access-Control-Allow-Origin", async () => {
+      mockGet.mockResolvedValue(CACHED_PAYLOAD)
+      const res = await GET(syncRequest(USER_ID, EXTENSION_ORIGIN))
+      expect(res.headers.get("Access-Control-Allow-Origin")).toBe(EXTENSION_ORIGIN)
+    })
+
+    it("does not set Access-Control-Allow-Origin for an unrelated origin", async () => {
+      mockGet.mockResolvedValue(CACHED_PAYLOAD)
+      const res = await GET(syncRequest(USER_ID, "https://evil.com"))
+      expect(res.headers.get("Access-Control-Allow-Origin")).toBeNull()
+    })
+
+    it("responds to an OPTIONS preflight from the extension origin with 204 and CORS headers", async () => {
+      const headers = new Headers()
+      headers.set("origin", EXTENSION_ORIGIN)
+      const res = await OPTIONS(new Request("http://localhost/api/sync", { method: "OPTIONS", headers }))
+      expect(res.status).toBe(204)
+      expect(res.headers.get("Access-Control-Allow-Origin")).toBe(EXTENSION_ORIGIN)
     })
   })
 })

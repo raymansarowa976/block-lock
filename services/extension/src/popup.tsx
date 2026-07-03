@@ -1,12 +1,11 @@
 import React, { useEffect, useState } from "react"
+import { DASHBOARD_URL } from "./config"
 
 type StorageState = {
   userId?: string
   lastSync?: string
   authError?: string | null
 }
-
-const DASHBOARD_URL = `${import.meta.env.VITE_DASHBOARD_URL ?? "https://block-lock.vercel.app"}/login`
 
 export function Popup(): React.ReactElement {
   const [storage, setStorage] = useState<StorageState | null>(null)

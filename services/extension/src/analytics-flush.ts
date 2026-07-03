@@ -1,6 +1,5 @@
 import type { UsageEntry } from "./analytics-buffer"
-
-const API_BASE = import.meta.env.VITE_API_BASE ?? "https://block-lock.vercel.app/api"
+import { API_BASE } from "./config"
 
 export const FLUSH_ALARM = "analytics-flush"
 const FLUSH_INTERVAL_MINUTES = 5

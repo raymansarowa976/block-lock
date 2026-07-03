@@ -10,7 +10,7 @@ vi.mock("@/lib/prisma", () => ({
 
 import { auth } from "@/auth"
 import { prisma } from "@/lib/prisma"
-import { POST } from "@/app/api/analytics/route"
+import { POST, OPTIONS } from "@/app/api/analytics/route"
 
 const mockAuth = auth as unknown as Mock
 const mockCreateMany = (
@@ -20,15 +20,20 @@ const mockCreateMany = (
 const USER_ID = "clh3q5g0o0000qmij2z3m4n5k"
 const AUTHED_SESSION = { user: { id: USER_ID }, expires: "" }
 
+const EXTENSION_ID = "ldlmnamnojhcjjnfoodglmcnaedagljl"
+const EXTENSION_ORIGIN = `chrome-extension://${EXTENSION_ID}`
+
 const VALID_ENTRIES = [
   { domain: "example.com", startedAt: 1000, duration: 60000 },
   { domain: "another.com", startedAt: 61000, duration: 30000 },
 ]
 
-function jsonRequest(body: unknown) {
+function jsonRequest(body: unknown, origin?: string) {
+  const headers = new Headers({ "Content-Type": "application/json" })
+  if (origin) headers.set("origin", origin)
   return new Request("http://localhost/api/analytics", {
     method: "POST",
-    headers: { "Content-Type": "application/json" },
+    headers,
     body: JSON.stringify(body),
   })
 }
@@ -36,6 +41,7 @@ function jsonRequest(body: unknown) {
 beforeEach(() => {
   vi.clearAllMocks()
   mockCreateMany.mockResolvedValue({ count: VALID_ENTRIES.length })
+  process.env.NEXT_PUBLIC_EXTENSION_ID = EXTENSION_ID
 })
 
 // ---------------------------------------------------------------------------
@@ -197,5 +203,33 @@ describe("POST /api/analytics – success response", () => {
     const res = await POST(jsonRequest({ entries: VALID_ENTRIES }))
     const body = await res.json()
     expect(body.count).toBe(VALID_ENTRIES.length)
+  })
+})
+
+// ---------------------------------------------------------------------------
+// POST /api/analytics – CORS (chrome-extension origin)
+// ---------------------------------------------------------------------------
+
+describe("POST /api/analytics – CORS – extension origin handling", () => {
+  beforeEach(() => {
+    mockAuth.mockResolvedValue(AUTHED_SESSION)
+  })
+
+  it("echoes the extension origin in Access-Control-Allow-Origin", async () => {
+    const res = await POST(jsonRequest({ entries: VALID_ENTRIES }, EXTENSION_ORIGIN))
+    expect(res.headers.get("Access-Control-Allow-Origin")).toBe(EXTENSION_ORIGIN)
+  })
+
+  it("does not set Access-Control-Allow-Origin for an unrelated origin", async () => {
+    const res = await POST(jsonRequest({ entries: VALID_ENTRIES }, "https://evil.com"))
+    expect(res.headers.get("Access-Control-Allow-Origin")).toBeNull()
+  })
+
+  it("responds to an OPTIONS preflight from the extension origin with 204 and CORS headers", async () => {
+    const headers = new Headers()
+    headers.set("origin", EXTENSION_ORIGIN)
+    const res = await OPTIONS(new Request("http://localhost/api/analytics", { method: "OPTIONS", headers }))
+    expect(res.status).toBe(204)
+    expect(res.headers.get("Access-Control-Allow-Origin")).toBe(EXTENSION_ORIGIN)
   })
 })

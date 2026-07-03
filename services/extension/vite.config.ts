@@ -5,6 +5,7 @@ import { resolve } from "path"
 import { copyFileSync } from "fs"
 
 export default defineConfig({
+  envPrefix: ["VITE_", "NEXT_PUBLIC_"],
   plugins: [
     react(),
     tailwindcss(),
