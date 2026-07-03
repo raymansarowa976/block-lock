@@ -164,6 +164,38 @@ describe("TimeLimitForm — optimistic add", () => {
       userEvent.click(screen.getByRole("button", { name: /add/i })),
     ).resolves.not.toThrow()
   })
+
+  it("calls onOptimisticAddFailed with the id returned by onOptimisticAdd when the action fails", async () => {
+    mockCreate.mockResolvedValue({ success: false, error: "This domain is already in your list." })
+    const onOptimisticAdd = vi.fn().mockReturnValue("optimistic-1")
+    const onOptimisticAddFailed = vi.fn()
+    render(
+      <TimeLimitForm
+        onOptimisticAdd={onOptimisticAdd}
+        onOptimisticAddFailed={onOptimisticAddFailed}
+      />,
+    )
+
+    await userEvent.type(screen.getByLabelText(/website/i), "example.com")
+    await userEvent.click(screen.getByRole("button", { name: /add/i }))
+
+    await waitFor(() => {
+      expect(onOptimisticAddFailed).toHaveBeenCalledWith("optimistic-1")
+    })
+  })
+
+  it("does not call onOptimisticAddFailed when the action succeeds", async () => {
+    const onOptimisticAddFailed = vi.fn()
+    render(<TimeLimitForm onOptimisticAddFailed={onOptimisticAddFailed} />)
+
+    await userEvent.type(screen.getByLabelText(/website/i), "example.com")
+    await userEvent.click(screen.getByRole("button", { name: /add/i }))
+
+    await waitFor(() => {
+      expect(mockCreate).toHaveBeenCalled()
+    })
+    expect(onOptimisticAddFailed).not.toHaveBeenCalled()
+  })
 })
 
 // ---------------------------------------------------------------------------

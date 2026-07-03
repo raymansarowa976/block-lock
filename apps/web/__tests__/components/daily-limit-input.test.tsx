@@ -3,6 +3,10 @@ import userEvent from "@testing-library/user-event"
 import { describe, it, expect, vi, beforeEach } from "vitest"
 import { TimeLimitForm } from "@/components/time-limit-form"
 
+vi.mock("next/navigation", () => ({
+  useRouter: () => ({ refresh: vi.fn() }),
+}))
+
 vi.mock("@/lib/actions/time-limits", () => ({
   createTimeLimit: vi.fn(),
 }))
