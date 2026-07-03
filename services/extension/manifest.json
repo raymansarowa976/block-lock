@@ -13,7 +13,7 @@
   "host_permissions": ["<all_urls>"],
   "externally_connectable": {
     "matches": [
-      "https://block-lock.vercel.app/*",
+      "https://blocklock.app/*",
       "http://localhost:3000/*"
     ]
   },
