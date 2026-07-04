@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useOptimistic, useCallback } from "react"
+import { useState, useOptimistic, useCallback, startTransition } from "react"
 import { Globe, Trash2, Clock, Pause, Play, X } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { cn } from "@/lib/utils"
@@ -59,7 +59,9 @@ export function ActiveRulesList({ timeLimits }: ActiveRulesListProps) {
   const handleDelete = useCallback(async (id: string) => {
     setError(null)
     setPendingDeletes((s) => new Set(s).add(id))
-    addOptimistic({ type: "delete", id })
+    startTransition(() => {
+      addOptimistic({ type: "delete", id })
+    })
     try {
       const result = await deleteTimeLimit(id)
       if (!result.success) {
@@ -77,7 +79,9 @@ export function ActiveRulesList({ timeLimits }: ActiveRulesListProps) {
   const handleToggle = useCallback(async (id: string) => {
     setError(null)
     setPendingToggles((s) => new Set(s).add(id))
-    addOptimistic({ type: "toggle", id })
+    startTransition(() => {
+      addOptimistic({ type: "toggle", id })
+    })
     try {
       const rule = timeLimits.find((r) => r.id === id)
       const result = await updateTimeLimit(id, { isActive: !rule?.isActive })
