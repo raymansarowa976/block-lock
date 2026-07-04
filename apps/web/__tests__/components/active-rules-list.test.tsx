@@ -80,6 +80,32 @@ describe("ActiveRulesList — status markers", () => {
   })
 })
 
+describe("ActiveRulesList — optimistic updates", () => {
+  it("does not log a React error when deleting a rule", async () => {
+    const consoleError = vi.spyOn(console, "error").mockImplementation(() => {})
+    const rules = [makeRule()]
+    render(<ActiveRulesList timeLimits={rules} />)
+    await userEvent.click(screen.getByRole("button", { name: /delete example.com/i }))
+    await waitFor(() => {
+      expect(mockDelete).toHaveBeenCalled()
+    })
+    expect(consoleError).not.toHaveBeenCalled()
+    consoleError.mockRestore()
+  })
+
+  it("does not log a React error when toggling a rule", async () => {
+    const consoleError = vi.spyOn(console, "error").mockImplementation(() => {})
+    const rules = [makeRule()]
+    render(<ActiveRulesList timeLimits={rules} />)
+    await userEvent.click(screen.getByRole("button", { name: /pause rule/i }))
+    await waitFor(() => {
+      expect(mockUpdate).toHaveBeenCalled()
+    })
+    expect(consoleError).not.toHaveBeenCalled()
+    consoleError.mockRestore()
+  })
+})
+
 describe("ActiveRulesList — extension sync notifications", () => {
   it("notifies the extension after successfully deleting a rule", async () => {
     const rules = [makeRule()]
