@@ -8,6 +8,7 @@ import { Clock, CalendarDays } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
+import { TimeSelect } from "@/components/time-select"
 import { cn } from "@/lib/utils"
 import { createSchedule } from "@/lib/actions/schedules"
 
@@ -99,15 +100,35 @@ export function ScheduleForm({ timeLimits }: ScheduleFormProps) {
 
         <div className="grid grid-cols-2 gap-3">
           <div className="space-y-1.5">
-            <Label htmlFor="startTime" className="text-slate-700">Start Time</Label>
-            <Input id="startTime" type="time" {...register("startTime")} />
+            <Controller
+              name="startTime"
+              control={control}
+              render={({ field }) => (
+                <TimeSelect
+                  id="startTime"
+                  label="Start Time"
+                  value={field.value}
+                  onChange={field.onChange}
+                />
+              )}
+            />
             {errors.startTime && (
               <p className="text-xs text-destructive">{errors.startTime.message}</p>
             )}
           </div>
           <div className="space-y-1.5">
-            <Label htmlFor="endTime" className="text-slate-700">End Time</Label>
-            <Input id="endTime" type="time" {...register("endTime")} />
+            <Controller
+              name="endTime"
+              control={control}
+              render={({ field }) => (
+                <TimeSelect
+                  id="endTime"
+                  label="End Time"
+                  value={field.value}
+                  onChange={field.onChange}
+                />
+              )}
+            />
             {errors.endTime && (
               <p className="text-xs text-destructive">{errors.endTime.message}</p>
             )}
