@@ -13,20 +13,24 @@ vi.mock("@/lib/actions/schedules", () => ({
 import { createSchedule } from "@/lib/actions/schedules"
 const mockCreate = createSchedule as ReturnType<typeof vi.fn>
 
+async function selectTime(label: string, time: string) {
+  await userEvent.selectOptions(screen.getByRole("combobox", { name: label }), time)
+}
+
 beforeEach(() => {
   vi.clearAllMocks()
   mockCreate.mockResolvedValue({ success: true, data: {} })
 })
 
 describe("ScheduleForm", () => {
-  it("renders a start time input", () => {
+  it("renders a start time dropdown", () => {
     render(<ScheduleForm timeLimits={TIME_LIMITS} />)
-    expect(screen.getByLabelText(/start time/i)).toBeInTheDocument()
+    expect(screen.getByRole("combobox", { name: "Start Time" })).toBeInTheDocument()
   })
 
-  it("renders an end time input", () => {
+  it("renders an end time dropdown", () => {
     render(<ScheduleForm timeLimits={TIME_LIMITS} />)
-    expect(screen.getByLabelText(/end time/i)).toBeInTheDocument()
+    expect(screen.getByRole("combobox", { name: "End Time" })).toBeInTheDocument()
   })
 
   it("renders day-of-week toggle buttons for all 7 days", () => {
@@ -45,8 +49,8 @@ describe("ScheduleForm", () => {
   it("shows a validation error when no days are selected on submit", async () => {
     render(<ScheduleForm timeLimits={TIME_LIMITS} />)
     await userEvent.type(screen.getByLabelText(/website/i), "example.com")
-    await userEvent.type(screen.getByLabelText(/start time/i), "09:00")
-    await userEvent.type(screen.getByLabelText(/end time/i), "17:00")
+    await selectTime("Start Time", "09:00")
+    await selectTime("End Time", "17:00")
     await userEvent.click(screen.getByRole("button", { name: /save/i }))
     await waitFor(() => {
       expect(screen.getByText(/at least one day/i)).toBeInTheDocument()
@@ -59,8 +63,8 @@ describe("ScheduleForm", () => {
     )
     render(<ScheduleForm timeLimits={TIME_LIMITS} />)
     await userEvent.type(screen.getByLabelText(/website/i), "example.com")
-    await userEvent.type(screen.getByLabelText(/start time/i), "09:00")
-    await userEvent.type(screen.getByLabelText(/end time/i), "17:00")
+    await selectTime("Start Time", "09:00")
+    await selectTime("End Time", "17:00")
     await userEvent.click(screen.getByRole("button", { name: "Sunday" }))
     await userEvent.click(screen.getByRole("button", { name: /save/i }))
     await waitFor(() =>
@@ -74,8 +78,8 @@ describe("ScheduleForm", () => {
     )
     render(<ScheduleForm timeLimits={TIME_LIMITS} />)
     await userEvent.type(screen.getByLabelText(/website/i), "example.com")
-    await userEvent.type(screen.getByLabelText(/start time/i), "09:00")
-    await userEvent.type(screen.getByLabelText(/end time/i), "17:00")
+    await selectTime("Start Time", "09:00")
+    await selectTime("End Time", "17:00")
     await userEvent.click(screen.getByRole("button", { name: "Sunday" }))
     await userEvent.click(screen.getByRole("button", { name: /save/i }))
     await waitFor(() =>
@@ -86,8 +90,8 @@ describe("ScheduleForm", () => {
   it("calls createSchedule with the correct payload on valid submit", async () => {
     render(<ScheduleForm timeLimits={TIME_LIMITS} />)
     await userEvent.type(screen.getByLabelText(/website/i), "example.com")
-    await userEvent.type(screen.getByLabelText(/start time/i), "09:00")
-    await userEvent.type(screen.getByLabelText(/end time/i), "17:00")
+    await selectTime("Start Time", "09:00")
+    await selectTime("End Time", "17:00")
     await userEvent.click(screen.getByRole("button", { name: "Monday" }))
     await userEvent.click(screen.getByRole("button", { name: /save/i }))
     await waitFor(() => {
