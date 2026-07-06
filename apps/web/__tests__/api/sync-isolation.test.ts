@@ -27,8 +27,10 @@ const mockFindMany = (
 
 const USER_ID = "clh3q5g0o0000qmij2z3m4n5k"
 
-// Redis holds rule for "redis-domain.com"
-const REDIS_PAYLOAD = JSON.stringify({
+// Redis holds rule for "redis-domain.com".
+// @upstash/redis automatically deserializes JSON, so redis.get() resolves
+// with the parsed object rather than a raw string.
+const REDIS_PAYLOAD = {
   userId: USER_ID,
   rules: [{
     id: "clh3q5g0o0001qmij2z3m4n5k",
@@ -41,7 +43,7 @@ const REDIS_PAYLOAD = JSON.stringify({
   }],
   schedules: [],
   syncedAt: "2025-01-01T00:00:00.000Z",
-})
+}
 
 // Prisma would return a different rule for "prisma-domain.com"
 const PRISMA_RULES = [{

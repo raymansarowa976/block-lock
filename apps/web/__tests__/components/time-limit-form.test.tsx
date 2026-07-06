@@ -3,6 +3,11 @@ import userEvent from "@testing-library/user-event"
 import { describe, it, expect, vi, beforeEach } from "vitest"
 import { TimeLimitForm } from "@/components/time-limit-form"
 
+const mockRouterRefresh = vi.fn()
+vi.mock("next/navigation", () => ({
+  useRouter: () => ({ refresh: mockRouterRefresh }),
+}))
+
 vi.mock("@/lib/actions/time-limits", () => ({
   createTimeLimit: vi.fn(),
 }))
@@ -117,5 +122,104 @@ describe("TimeLimitForm", () => {
       expect(mockCreate).toHaveBeenCalled()
     })
     expect(mockNotify).not.toHaveBeenCalled()
+  })
+})
+
+// ---------------------------------------------------------------------------
+// TimeLimitForm — optimistic add (Blocking Engine Thread Lag / stale UI fix)
+// ---------------------------------------------------------------------------
+
+describe("TimeLimitForm — optimistic add", () => {
+  it("calls onOptimisticAdd immediately, before the server action resolves", async () => {
+    mockCreate.mockImplementation(() => new Promise(() => {})) // never resolves
+    const onOptimisticAdd = vi.fn()
+    render(<TimeLimitForm onOptimisticAdd={onOptimisticAdd} />)
+
+    await userEvent.type(screen.getByLabelText(/website/i), "example.com")
+    await userEvent.click(screen.getByRole("button", { name: /add/i }))
+
+    await waitFor(() => {
+      expect(onOptimisticAdd).toHaveBeenCalledWith(
+        expect.objectContaining({ domain: "example.com" }),
+      )
+    })
+  })
+
+  it("does not call onOptimisticAdd when validation fails", async () => {
+    const onOptimisticAdd = vi.fn()
+    render(<TimeLimitForm onOptimisticAdd={onOptimisticAdd} />)
+
+    await userEvent.click(screen.getByRole("button", { name: /add/i }))
+
+    await waitFor(() => {
+      expect(screen.getByText(/website address is required/i)).toBeInTheDocument()
+    })
+    expect(onOptimisticAdd).not.toHaveBeenCalled()
+  })
+
+  it("does not throw when onOptimisticAdd is not provided", async () => {
+    render(<TimeLimitForm />)
+    await userEvent.type(screen.getByLabelText(/website/i), "example.com")
+    await expect(
+      userEvent.click(screen.getByRole("button", { name: /add/i })),
+    ).resolves.not.toThrow()
+  })
+
+  it("calls onOptimisticAddFailed with the id returned by onOptimisticAdd when the action fails", async () => {
+    mockCreate.mockResolvedValue({ success: false, error: "This domain is already in your list." })
+    const onOptimisticAdd = vi.fn().mockReturnValue("optimistic-1")
+    const onOptimisticAddFailed = vi.fn()
+    render(
+      <TimeLimitForm
+        onOptimisticAdd={onOptimisticAdd}
+        onOptimisticAddFailed={onOptimisticAddFailed}
+      />,
+    )
+
+    await userEvent.type(screen.getByLabelText(/website/i), "example.com")
+    await userEvent.click(screen.getByRole("button", { name: /add/i }))
+
+    await waitFor(() => {
+      expect(onOptimisticAddFailed).toHaveBeenCalledWith("optimistic-1")
+    })
+  })
+
+  it("does not call onOptimisticAddFailed when the action succeeds", async () => {
+    const onOptimisticAddFailed = vi.fn()
+    render(<TimeLimitForm onOptimisticAddFailed={onOptimisticAddFailed} />)
+
+    await userEvent.type(screen.getByLabelText(/website/i), "example.com")
+    await userEvent.click(screen.getByRole("button", { name: /add/i }))
+
+    await waitFor(() => {
+      expect(mockCreate).toHaveBeenCalled()
+    })
+    expect(onOptimisticAddFailed).not.toHaveBeenCalled()
+  })
+})
+
+// ---------------------------------------------------------------------------
+// TimeLimitForm — router cache refresh after mutation settles
+// ---------------------------------------------------------------------------
+
+describe("TimeLimitForm — router refresh", () => {
+  it("refreshes the router cache after a successful submission", async () => {
+    render(<TimeLimitForm />)
+    await userEvent.type(screen.getByLabelText(/website/i), "example.com")
+    await userEvent.click(screen.getByRole("button", { name: /add/i }))
+    await waitFor(() => {
+      expect(mockRouterRefresh).toHaveBeenCalled()
+    })
+  })
+
+  it("does not refresh the router cache when the submission fails", async () => {
+    mockCreate.mockResolvedValue({ success: false, error: "This domain is already in your list." })
+    render(<TimeLimitForm />)
+    await userEvent.type(screen.getByLabelText(/website/i), "example.com")
+    await userEvent.click(screen.getByRole("button", { name: /add/i }))
+    await waitFor(() => {
+      expect(mockCreate).toHaveBeenCalled()
+    })
+    expect(mockRouterRefresh).not.toHaveBeenCalled()
   })
 })

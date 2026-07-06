@@ -32,9 +32,11 @@ vi.mock("@prisma/client", () => ({
 import { auth } from "@/auth"
 import { prisma } from "@/lib/prisma"
 import { redis } from "@/lib/redis"
+import { revalidatePath } from "next/cache"
 import { createTimeLimit, updateTimeLimit, deleteTimeLimit } from "@/lib/actions/time-limits"
 import { createSchedule, updateSchedule, deleteSchedule } from "@/lib/actions/schedules"
 
+const mockRevalidatePath = revalidatePath as unknown as Mock
 const mockAuth = auth as unknown as Mock
 const mockPrisma = prisma as unknown as {
   $transaction: ReturnType<typeof vi.fn>
@@ -294,5 +296,82 @@ describe("deleteSchedule — cache invalidation", () => {
     await expect(deleteSchedule(SCHEDULE_ID)).rejects.toThrow()
 
     expect(mockDel).not.toHaveBeenCalled()
+  })
+})
+
+// ---------------------------------------------------------------------------
+// revalidatePath — router cache invalidation (Blocking Engine Thread Lag fix)
+//
+// Regression coverage for the "stale until hard reload" bug: every mutation
+// must invalidate the Next.js router cache for /dashboard so a client-side
+// refresh actually picks up fresh data instead of a stale RSC payload.
+// ---------------------------------------------------------------------------
+
+describe("createTimeLimit — router cache revalidation", () => {
+  it("revalidates /dashboard after a successful creation", async () => {
+    mockAuth.mockResolvedValue(AUTHED_SESSION)
+    mockPrisma.timeLimit.create.mockResolvedValue(makeTimeLimit())
+
+    await createTimeLimit({ domain: "example.com", dailyLimit: 30 })
+
+    expect(mockRevalidatePath).toHaveBeenCalledWith("/dashboard")
+  })
+
+  it("does not revalidate when not authenticated", async () => {
+    mockAuth.mockResolvedValue(null)
+
+    await createTimeLimit({ domain: "example.com", dailyLimit: 30 })
+
+    expect(mockRevalidatePath).not.toHaveBeenCalled()
+  })
+
+  it("does not revalidate on input validation failure", async () => {
+    mockAuth.mockResolvedValue(AUTHED_SESSION)
+
+    await createTimeLimit({ domain: "not a valid domain!!!" })
+
+    expect(mockRevalidatePath).not.toHaveBeenCalled()
+  })
+})
+
+describe("updateTimeLimit — router cache revalidation", () => {
+  it("revalidates /dashboard after a successful update", async () => {
+    mockAuth.mockResolvedValue(AUTHED_SESSION)
+    mockPrisma.timeLimit.findUnique.mockResolvedValue(makeTimeLimit())
+    mockPrisma.timeLimit.update.mockResolvedValue(makeTimeLimit())
+
+    await updateTimeLimit(LIMIT_ID, { isActive: false })
+
+    expect(mockRevalidatePath).toHaveBeenCalledWith("/dashboard")
+  })
+
+  it("does not revalidate when the Prisma transaction throws", async () => {
+    mockAuth.mockResolvedValue(AUTHED_SESSION)
+    mockPrisma.timeLimit.findUnique.mockResolvedValue(makeTimeLimit(OTHER_USER_ID))
+
+    await expect(updateTimeLimit(LIMIT_ID, { isActive: false })).rejects.toThrow()
+
+    expect(mockRevalidatePath).not.toHaveBeenCalled()
+  })
+})
+
+describe("deleteTimeLimit — router cache revalidation", () => {
+  it("revalidates /dashboard after a successful deletion", async () => {
+    mockAuth.mockResolvedValue(AUTHED_SESSION)
+    mockPrisma.timeLimit.findUnique.mockResolvedValue(makeTimeLimit())
+    mockPrisma.timeLimit.delete.mockResolvedValue(undefined)
+
+    await deleteTimeLimit(LIMIT_ID)
+
+    expect(mockRevalidatePath).toHaveBeenCalledWith("/dashboard")
+  })
+
+  it("does not revalidate when the Prisma transaction throws", async () => {
+    mockAuth.mockResolvedValue(AUTHED_SESSION)
+    mockPrisma.timeLimit.findUnique.mockResolvedValue(makeTimeLimit(OTHER_USER_ID))
+
+    await expect(deleteTimeLimit(LIMIT_ID)).rejects.toThrow()
+
+    expect(mockRevalidatePath).not.toHaveBeenCalled()
   })
 })

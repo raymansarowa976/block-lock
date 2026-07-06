@@ -1,9 +1,8 @@
 import { auth } from "@/auth"
 import { prisma } from "@/lib/prisma"
 import { ErrorBoundary } from "@/components/error-boundary"
-import { TimeLimitForm } from "@/components/time-limit-form"
 import { ScheduleForm } from "@/components/schedule-form"
-import { ActiveRulesList } from "@/components/active-rules-list"
+import { DashboardRules } from "@/components/dashboard-rules"
 
 async function getUserTimeLimits(userId: string) {
   return prisma.timeLimit.findMany({
@@ -46,22 +45,11 @@ export default async function DashboardPage() {
         </span>
       </div>
 
-      <div className="grid grid-cols-1 gap-6 lg:grid-cols-5">
-        <div className="space-y-6 lg:col-span-3">
-          <ErrorBoundary>
-            <TimeLimitForm />
-          </ErrorBoundary>
-          <ErrorBoundary>
-            <ScheduleForm timeLimits={timeLimits} />
-          </ErrorBoundary>
-        </div>
-
-        <div className="lg:col-span-2">
-          <ErrorBoundary>
-            <ActiveRulesList timeLimits={timeLimits} />
-          </ErrorBoundary>
-        </div>
-      </div>
+      <DashboardRules timeLimits={timeLimits}>
+        <ErrorBoundary>
+          <ScheduleForm timeLimits={timeLimits} />
+        </ErrorBoundary>
+      </DashboardRules>
     </div>
   )
 }

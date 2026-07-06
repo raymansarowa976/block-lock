@@ -54,7 +54,9 @@ function makeSchedule(overrides: Record<string, unknown> = {}) {
   }
 }
 
-const CACHED_PAYLOAD = JSON.stringify({
+// @upstash/redis automatically deserializes JSON, so redis.get() resolves
+// with the parsed object rather than a raw string.
+const CACHED_PAYLOAD = {
   userId: USER_ID,
   rules: [
     {
@@ -69,7 +71,7 @@ const CACHED_PAYLOAD = JSON.stringify({
   ],
   schedules: [],
   syncedAt: "2025-01-01T00:00:00.000Z",
-})
+}
 
 const EXTENSION_ID = "ldlmnamnojhcjjnfoodglmcnaedagljl"
 const EXTENSION_ORIGIN = `chrome-extension://${EXTENSION_ID}`
@@ -133,7 +135,7 @@ describe("GET /api/sync", () => {
       mockGet.mockResolvedValue(CACHED_PAYLOAD)
       const res = await GET(syncRequest(USER_ID))
       const body = await res.json()
-      expect(body).toEqual(JSON.parse(CACHED_PAYLOAD))
+      expect(body).toEqual(CACHED_PAYLOAD)
     })
 
     it("looks up the cache under the user:rules:{userId} key pattern", async () => {
@@ -197,17 +199,18 @@ describe("GET /api/sync", () => {
       expect(ttl).toBeGreaterThan(0)
     })
 
-    it("writes a valid JSON string to Redis", async () => {
+    it("writes a plain serializable payload object to Redis", async () => {
       mockFindMany.mockResolvedValue([makeTimeLimit()])
       await GET(syncRequest(USER_ID))
       const [, value] = mockSet.mock.calls[0]
-      expect(() => JSON.parse(value as string)).not.toThrow()
+      expect(() => JSON.stringify(value)).not.toThrow()
+      expect(typeof value).toBe("object")
     })
 
     it("stores the userId inside the cached payload", async () => {
       mockFindMany.mockResolvedValue([makeTimeLimit()])
       await GET(syncRequest(USER_ID))
-      const cached = JSON.parse(mockSet.mock.calls[0][1] as string)
+      const cached = mockSet.mock.calls[0][1] as { userId: string }
       expect(cached.userId).toBe(USER_ID)
     })
 

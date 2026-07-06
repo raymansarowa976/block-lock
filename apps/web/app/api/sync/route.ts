@@ -23,9 +23,11 @@ export async function GET(request: Request) {
   }
 
   // ── Cache read ──────────────────────────────────────────────────────────
+  // @upstash/redis automatically deserializes JSON, so `cached` is already
+  // a plain object here — do not JSON.parse it.
   const cached = await redis.get(cacheKey(userId))
   if (cached) {
-    return NextResponse.json(JSON.parse(cached as string), { headers })
+    return NextResponse.json(cached, { headers })
   }
 
   // ── Cache miss: query Prisma, write back, respond ───────────────────────
@@ -42,7 +44,7 @@ export async function GET(request: Request) {
     syncedAt: new Date(),
   }
 
-  await redis.set(cacheKey(userId), JSON.stringify(payload), { ex: CACHE_TTL_SECONDS })
+  await redis.set(cacheKey(userId), payload, { ex: CACHE_TTL_SECONDS })
 
   return NextResponse.json(payload, { headers })
 }
