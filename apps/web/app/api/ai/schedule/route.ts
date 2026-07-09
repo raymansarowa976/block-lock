@@ -4,8 +4,18 @@ import { auth } from "@/auth"
 import { rateLimit } from "@/lib/rate-limit"
 import { prisma } from "@/lib/prisma"
 import { redis } from "@/lib/redis"
+import { DEFAULT_DAILY_LIMIT_MINUTES } from "@/lib/constants"
 import { AIScheduleParseRequestSchema, AIScheduleParseResultSchema } from "@block-lock/shared-types"
 import { parseScheduleFromPrompt } from "@/lib/ai/schedule-parser"
+
+// A schedule can never attach to an unconditionally-blocked (dailyLimit:
+// null) TimeLimit — thrown inside the transaction to abort and roll back
+// the whole batch of parsed blocks when one targets an already-blocked domain.
+class BlockedDomainError extends Error {
+  constructor(public domain: string) {
+    super(`${domain} is already blocked`)
+  }
+}
 
 export async function POST(request: Request) {
   const session = await auth()
@@ -61,26 +71,40 @@ export async function POST(request: Request) {
     )
   }
 
-  const created = await prisma.$transaction(async (tx) => {
-    const records = []
-    for (const block of parsedResult.data.blocks) {
-      const timeLimit = await tx.timeLimit.upsert({
-        where: { userId_domain: { userId, domain: block.domain } },
-        update: {},
-        create: { userId, domain: block.domain, dailyLimit: null, isActive: true },
-      })
-      const schedule = await tx.schedule.create({
-        data: {
-          timeLimitId: timeLimit.id,
-          startTime: block.startTime,
-          endTime: block.endTime,
-          daysOfWeek: block.daysOfWeek,
-        },
-      })
-      records.push({ timeLimit, schedule })
+  let created
+  try {
+    created = await prisma.$transaction(async (tx) => {
+      const records = []
+      for (const block of parsedResult.data.blocks) {
+        const timeLimit = await tx.timeLimit.upsert({
+          where: { userId_domain: { userId, domain: block.domain } },
+          update: {},
+          create: { userId, domain: block.domain, dailyLimit: DEFAULT_DAILY_LIMIT_MINUTES, isActive: true },
+        })
+        if (timeLimit.dailyLimit === null) {
+          throw new BlockedDomainError(block.domain)
+        }
+        const schedule = await tx.schedule.create({
+          data: {
+            timeLimitId: timeLimit.id,
+            startTime: block.startTime,
+            endTime: block.endTime,
+            daysOfWeek: block.daysOfWeek,
+          },
+        })
+        records.push({ timeLimit, schedule })
+      }
+      return records
+    })
+  } catch (err) {
+    if (err instanceof BlockedDomainError) {
+      return NextResponse.json(
+        { success: false, error: `Cannot schedule ${err.domain} — it is already blocked` },
+        { status: 409 },
+      )
     }
-    return records
-  })
+    throw err
+  }
 
   await redis.del(`user:rules:${userId}`)
   revalidatePath("/dashboard")

@@ -19,6 +19,7 @@ import { redis } from "@/lib/redis"
 import { prisma } from "@/lib/prisma"
 import { parseScheduleFromPrompt } from "@/lib/ai/schedule-parser"
 import { POST } from "@/app/api/ai/schedule/route"
+import { DEFAULT_DAILY_LIMIT_MINUTES } from "@/lib/constants"
 
 const mockAuth = auth as unknown as Mock
 const mockRateLimit = rateLimit as unknown as Mock
@@ -48,7 +49,7 @@ const VALID_BLOCK = {
 }
 
 function makeTimeLimit(domain = VALID_BLOCK.domain) {
-  return { id: LIMIT_ID, userId: USER_ID, domain, dailyLimit: null, isActive: true }
+  return { id: LIMIT_ID, userId: USER_ID, domain, dailyLimit: DEFAULT_DAILY_LIMIT_MINUTES, isActive: true }
 }
 
 function makeSchedule() {
@@ -256,6 +257,36 @@ describe("POST /api/ai/schedule – success path", () => {
     const args = mockPrisma.timeLimit.upsert.mock.calls[0][0]
     expect(args.create.userId).toBe(USER_ID)
     expect(args.create.domain).toBe(VALID_BLOCK.domain)
+  })
+
+  it("creates a new TimeLimit with the default daily limit rather than an unconditional block", async () => {
+    // A schedule can never attach to an unconditionally-blocked (dailyLimit:
+    // null) TimeLimit, so newly-created rows from parsed blocks must carry
+    // a real daily limit instead.
+    mockAuth.mockResolvedValue(AUTHED_SESSION)
+    mockRateLimit.mockResolvedValue(RATE_ALLOWED)
+    mockParse.mockResolvedValue({ blocks: [VALID_BLOCK] })
+    mockPrisma.timeLimit.upsert.mockResolvedValue(makeTimeLimit())
+    mockPrisma.schedule.create.mockResolvedValue(makeSchedule())
+
+    await POST(jsonRequest({ prompt: PROMPT }))
+
+    const args = mockPrisma.timeLimit.upsert.mock.calls[0][0]
+    expect(args.create.dailyLimit).toBe(DEFAULT_DAILY_LIMIT_MINUTES)
+  })
+
+  it("returns 409 and creates no schedule when the domain is already unconditionally blocked", async () => {
+    mockAuth.mockResolvedValue(AUTHED_SESSION)
+    mockRateLimit.mockResolvedValue(RATE_ALLOWED)
+    mockParse.mockResolvedValue({ blocks: [VALID_BLOCK] })
+    mockPrisma.timeLimit.upsert.mockResolvedValue({ ...makeTimeLimit(), dailyLimit: null })
+
+    const res = await POST(jsonRequest({ prompt: PROMPT }))
+    const body = await res.json()
+
+    expect(res.status).toBe(409)
+    expect(body.success).toBe(false)
+    expect(mockPrisma.schedule.create).not.toHaveBeenCalled()
   })
 
   it("creates the schedule with the parsed time window and days, attached to the resolved TimeLimit", async () => {

@@ -4,7 +4,7 @@ vi.mock("@/auth", () => ({ auth: vi.fn() }))
 vi.mock("@/lib/prisma", () => ({
   prisma: {
     $transaction: vi.fn(),
-    timeLimit: { findUnique: vi.fn() },
+    timeLimit: { findUnique: vi.fn(), create: vi.fn() },
     schedule: {
       create: vi.fn(),
       findUnique: vi.fn(),
@@ -20,14 +20,16 @@ import { auth } from "@/auth"
 import { prisma } from "@/lib/prisma"
 import {
   createSchedule,
+  createScheduleForDomain,
   updateSchedule,
   deleteSchedule,
 } from "@/lib/actions/schedules"
+import { DEFAULT_DAILY_LIMIT_MINUTES } from "@/lib/constants"
 
 const mockAuth = auth as unknown as Mock
 const mockPrisma = prisma as unknown as {
   $transaction: ReturnType<typeof vi.fn>
-  timeLimit: { findUnique: ReturnType<typeof vi.fn> }
+  timeLimit: { findUnique: ReturnType<typeof vi.fn>; create: ReturnType<typeof vi.fn> }
   schedule: {
     create: ReturnType<typeof vi.fn>
     findUnique: ReturnType<typeof vi.fn>
@@ -49,8 +51,15 @@ const VALID_SCHEDULE_INPUT = {
   daysOfWeek: [1, 2, 3, 4, 5],
 }
 
-function makeTimeLimit(userId = USER_ID) {
-  return { id: LIMIT_ID, userId, domain: "example.com", dailyLimit: 30, isActive: true }
+function makeTimeLimit(userId = USER_ID, overrides = {}) {
+  return {
+    id: LIMIT_ID,
+    userId,
+    domain: "example.com",
+    dailyLimit: 30,
+    isActive: true,
+    ...overrides,
+  }
 }
 
 function makeSchedule() {
@@ -126,6 +135,37 @@ describe("createSchedule", () => {
     expect(mockPrisma.schedule.create).toHaveBeenCalledWith({
       data: expect.objectContaining({ timeLimitId: LIMIT_ID }),
     })
+  })
+
+  // -------------------------------------------------------------------------
+  // Block / schedule mutual exclusivity — a website that is unconditionally
+  // blocked (TimeLimit.dailyLimit === null) cannot also have a schedule.
+  // -------------------------------------------------------------------------
+
+  it("rejects creating a schedule when the parent website is already blocked (dailyLimit null)", async () => {
+    mockAuth.mockResolvedValue(AUTHED_SESSION)
+    mockPrisma.timeLimit.findUnique.mockResolvedValue(
+      makeTimeLimit(USER_ID, { dailyLimit: null }),
+    )
+
+    const result = await createSchedule(VALID_SCHEDULE_INPUT)
+    expect(result.success).toBe(false)
+    if (!result.success) {
+      expect(result.error).toMatch(/blocked/i)
+    }
+    expect(mockPrisma.schedule.create).not.toHaveBeenCalled()
+  })
+
+  it("allows creating a schedule for a website that has a daily limit instead of a block", async () => {
+    mockAuth.mockResolvedValue(AUTHED_SESSION)
+    const created = makeSchedule()
+    mockPrisma.timeLimit.findUnique.mockResolvedValue(
+      makeTimeLimit(USER_ID, { dailyLimit: 30 }),
+    )
+    mockPrisma.schedule.create.mockResolvedValue(created)
+
+    const result = await createSchedule(VALID_SCHEDULE_INPUT)
+    expect(result).toEqual({ success: true, data: created })
   })
 })
 
@@ -207,5 +247,105 @@ describe("deleteSchedule", () => {
     const result = await deleteSchedule(SCHEDULE_ID)
     expect(result).toEqual({ success: true })
     expect(mockPrisma.schedule.delete).toHaveBeenCalledWith({ where: { id: SCHEDULE_ID } })
+  })
+})
+
+// ---------------------------------------------------------------------------
+// createScheduleForDomain — schedule a website by domain, auto-provisioning
+// the parent TimeLimit when the domain has no existing rule yet.
+// ---------------------------------------------------------------------------
+
+const VALID_DOMAIN_INPUT = {
+  domain: "example.com",
+  startTime: "09:00",
+  endTime: "17:00",
+  daysOfWeek: [1, 2, 3, 4, 5],
+}
+
+describe("createScheduleForDomain", () => {
+  it("returns Unauthorized when not authenticated", async () => {
+    mockAuth.mockResolvedValue(null)
+    const result = await createScheduleForDomain(VALID_DOMAIN_INPUT)
+    expect(result).toEqual({ success: false, error: "Unauthorized" })
+    expect(mockPrisma.schedule.create).not.toHaveBeenCalled()
+  })
+
+  it("returns field errors for an invalid domain", async () => {
+    mockAuth.mockResolvedValue(AUTHED_SESSION)
+    const result = await createScheduleForDomain({ ...VALID_DOMAIN_INPUT, domain: "not a domain!!!" })
+    expect(result.success).toBe(false)
+  })
+
+  it("returns field errors for an invalid time format", async () => {
+    mockAuth.mockResolvedValue(AUTHED_SESSION)
+    const result = await createScheduleForDomain({ ...VALID_DOMAIN_INPUT, startTime: "9am" })
+    expect(result.success).toBe(false)
+  })
+
+  it("returns field errors for an empty daysOfWeek array", async () => {
+    mockAuth.mockResolvedValue(AUTHED_SESSION)
+    const result = await createScheduleForDomain({ ...VALID_DOMAIN_INPUT, daysOfWeek: [] })
+    expect(result.success).toBe(false)
+  })
+
+  it("creates a new TimeLimit with the default daily limit when the domain has no existing rule", async () => {
+    mockAuth.mockResolvedValue(AUTHED_SESSION)
+    mockPrisma.timeLimit.findUnique.mockResolvedValue(null)
+    const createdTimeLimit = makeTimeLimit(USER_ID, { dailyLimit: DEFAULT_DAILY_LIMIT_MINUTES })
+    mockPrisma.timeLimit.create.mockResolvedValue(createdTimeLimit)
+    const createdSchedule = makeSchedule()
+    mockPrisma.schedule.create.mockResolvedValue(createdSchedule)
+
+    const result = await createScheduleForDomain(VALID_DOMAIN_INPUT)
+
+    expect(result).toEqual({
+      success: true,
+      data: { timeLimit: createdTimeLimit, schedule: createdSchedule },
+    })
+    expect(mockPrisma.timeLimit.create).toHaveBeenCalledWith({
+      data: expect.objectContaining({
+        userId: USER_ID,
+        domain: "example.com",
+        dailyLimit: DEFAULT_DAILY_LIMIT_MINUTES,
+      }),
+    })
+    expect(mockPrisma.schedule.create).toHaveBeenCalledWith({
+      data: expect.objectContaining({ timeLimitId: createdTimeLimit.id }),
+    })
+  })
+
+  it("reuses an existing, non-blocked TimeLimit instead of creating a new one", async () => {
+    mockAuth.mockResolvedValue(AUTHED_SESSION)
+    const existing = makeTimeLimit(USER_ID, { dailyLimit: 30 })
+    mockPrisma.timeLimit.findUnique.mockResolvedValue(existing)
+    const createdSchedule = makeSchedule()
+    mockPrisma.schedule.create.mockResolvedValue(createdSchedule)
+
+    const result = await createScheduleForDomain(VALID_DOMAIN_INPUT)
+
+    expect(result).toEqual({
+      success: true,
+      data: { timeLimit: existing, schedule: createdSchedule },
+    })
+    expect(mockPrisma.timeLimit.create).not.toHaveBeenCalled()
+    expect(mockPrisma.schedule.create).toHaveBeenCalledWith({
+      data: expect.objectContaining({ timeLimitId: existing.id }),
+    })
+  })
+
+  it("rejects when the domain is already blocked (dailyLimit null)", async () => {
+    mockAuth.mockResolvedValue(AUTHED_SESSION)
+    mockPrisma.timeLimit.findUnique.mockResolvedValue(
+      makeTimeLimit(USER_ID, { dailyLimit: null }),
+    )
+
+    const result = await createScheduleForDomain(VALID_DOMAIN_INPUT)
+
+    expect(result.success).toBe(false)
+    if (!result.success) {
+      expect(result.error).toMatch(/blocked/i)
+    }
+    expect(mockPrisma.timeLimit.create).not.toHaveBeenCalled()
+    expect(mockPrisma.schedule.create).not.toHaveBeenCalled()
   })
 })

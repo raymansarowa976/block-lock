@@ -32,6 +32,27 @@ function isScheduleCurrentlyActive(
   )
 }
 
+// A website cannot be blocked (dailyLimit: null) while it still has a
+// schedule attached — unschedule it first, or vice versa.
+async function checkBlockScheduleConflict(
+  timeLimitId: string,
+  data: { dailyLimit?: number | null },
+) {
+  if (data.dailyLimit !== null) return null
+
+  const timeLimit = await prisma.timeLimit.findUnique({
+    where: { id: timeLimitId },
+    include: { schedules: true },
+  })
+  if (timeLimit && timeLimit.schedules.length > 0) {
+    return {
+      success: false as const,
+      error: "Cannot block a website that has an active schedule",
+    }
+  }
+  return null
+}
+
 async function checkHardLock(userId: string, timeLimitId: string) {
   const user = await prisma.user.findUnique({ where: { id: userId } })
   if (!user?.hardLockMode) return null
@@ -88,6 +109,9 @@ export async function updateTimeLimit(id: string, raw: unknown) {
 
   const hardLockError = await checkHardLock(userId, id)
   if (hardLockError) return hardLockError
+
+  const blockScheduleError = await checkBlockScheduleConflict(id, parsed.data)
+  if (blockScheduleError) return blockScheduleError
 
   const timeLimit = await prisma.$transaction(async (tx) => {
     const existing = await tx.timeLimit.findUnique({ where: { id } })
