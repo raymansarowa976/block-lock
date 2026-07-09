@@ -49,8 +49,15 @@ const VALID_SCHEDULE_INPUT = {
   daysOfWeek: [1, 2, 3, 4, 5],
 }
 
-function makeTimeLimit(userId = USER_ID) {
-  return { id: LIMIT_ID, userId, domain: "example.com", dailyLimit: 30, isActive: true }
+function makeTimeLimit(userId = USER_ID, overrides = {}) {
+  return {
+    id: LIMIT_ID,
+    userId,
+    domain: "example.com",
+    dailyLimit: 30,
+    isActive: true,
+    ...overrides,
+  }
 }
 
 function makeSchedule() {
@@ -126,6 +133,37 @@ describe("createSchedule", () => {
     expect(mockPrisma.schedule.create).toHaveBeenCalledWith({
       data: expect.objectContaining({ timeLimitId: LIMIT_ID }),
     })
+  })
+
+  // -------------------------------------------------------------------------
+  // Block / schedule mutual exclusivity — a website that is unconditionally
+  // blocked (TimeLimit.dailyLimit === null) cannot also have a schedule.
+  // -------------------------------------------------------------------------
+
+  it("rejects creating a schedule when the parent website is already blocked (dailyLimit null)", async () => {
+    mockAuth.mockResolvedValue(AUTHED_SESSION)
+    mockPrisma.timeLimit.findUnique.mockResolvedValue(
+      makeTimeLimit(USER_ID, { dailyLimit: null }),
+    )
+
+    const result = await createSchedule(VALID_SCHEDULE_INPUT)
+    expect(result.success).toBe(false)
+    if (!result.success) {
+      expect(result.error).toMatch(/blocked/i)
+    }
+    expect(mockPrisma.schedule.create).not.toHaveBeenCalled()
+  })
+
+  it("allows creating a schedule for a website that has a daily limit instead of a block", async () => {
+    mockAuth.mockResolvedValue(AUTHED_SESSION)
+    const created = makeSchedule()
+    mockPrisma.timeLimit.findUnique.mockResolvedValue(
+      makeTimeLimit(USER_ID, { dailyLimit: 30 }),
+    )
+    mockPrisma.schedule.create.mockResolvedValue(created)
+
+    const result = await createSchedule(VALID_SCHEDULE_INPUT)
+    expect(result).toEqual({ success: true, data: created })
   })
 })
 
