@@ -28,19 +28,19 @@
 * **Bug Description:** Adding or removing restricted domain rules responds with severe latency delays; mutations do not show up immediately on the dashboard UI unless the user manually forces a hard browser page reload.
 * **Impact:** Medium. Breaks fluid UX flow and creates an illusion that the application backend didn't register the action.
 * **Remedial Action Tasks:**
-    * [ ] Refactor the domain submission form to employ React `useOptimistic` hooks.
-    * [ ] Ensure the Next.js Server Action triggers an instantaneous client-side router cache revalidation (`revalidatePath("/dashboard")`) immediately following database writes.
+    * [x] Refactor the domain submission form to employ React `useOptimistic` hooks.
+    * [x] Ensure the Next.js Server Action triggers an instantaneous client-side router cache revalidation (`revalidatePath("/dashboard")`) immediately following database writes.
 * **Verification Pass criteria:**
-    * [ ] [TEST] Assert that adding a domain increments the visible active rules list count smoothly within 0ms client-side execution latency.
+    * [x] [TEST] Assert that adding a domain increments the visible active rules list count smoothly within 0ms client-side execution latency.
 
 ### 4. Broken Exception Interceptions (Unpause Relapse Fallouts)
 * **Bug Description:** Triggering an unpause mutation on an active blocked profile throws an unhandled "An unexpected error occurred" toast exception error card directly on the UI workspace.
 * **Impact:** Medium. Prevents normal interactive modification patterns over existing database entry states.
 * **Remedial Action Tasks:**
-    * [ ] Wrap the unpause/resume transactional toggles in an explicit Prisma save try/catch operation block.
-    * [ ] Verify the target entity model attributes match required state properties before dispatching the database mutation payload.
+    * [x] Wrap the unpause/resume transactional toggles in an explicit Prisma save try/catch operation block.
+    * [x] Verify the target entity model attributes match required state properties before dispatching the database mutation payload.
 * **Verification Pass criteria:**
-    * [ ] [TEST] Click the unpause action switch button repeatedly on an active rule card to ensure zero validation alerts or generic error cards pop up into view.
+    * [x] [TEST] Click the unpause action switch button repeatedly on an active rule card to ensure zero validation alerts or generic error cards pop up into view.
 
 ---
 
