@@ -4,6 +4,7 @@ import {
   UpdateTimeLimitSchema,
   CreateScheduleSchema,
   UpdateScheduleSchema,
+  CreateScheduleForDomainSchema,
   UsageEventSchema,
   AnalyticsBatchSchema,
 } from "../index"
@@ -129,6 +130,57 @@ describe("CreateScheduleSchema", () => {
 
   it("rejects a missing timeLimitId", () => {
     const result = CreateScheduleSchema.safeParse({
+      startTime: "09:00",
+      endTime: "17:00",
+      daysOfWeek: [1],
+    })
+    expect(result.success).toBe(false)
+  })
+})
+
+describe("CreateScheduleForDomainSchema", () => {
+  it("accepts a valid domain-based schedule", () => {
+    const result = CreateScheduleForDomainSchema.safeParse({
+      domain: "example.com",
+      startTime: "09:00",
+      endTime: "17:00",
+      daysOfWeek: [1, 2, 3, 4, 5],
+    })
+    expect(result.success).toBe(true)
+  })
+
+  it("rejects an invalid domain format", () => {
+    const result = CreateScheduleForDomainSchema.safeParse({
+      domain: "not a domain!!!",
+      startTime: "09:00",
+      endTime: "17:00",
+      daysOfWeek: [1],
+    })
+    expect(result.success).toBe(false)
+  })
+
+  it("rejects an invalid time format", () => {
+    const result = CreateScheduleForDomainSchema.safeParse({
+      domain: "example.com",
+      startTime: "9:00",
+      endTime: "17:00",
+      daysOfWeek: [1],
+    })
+    expect(result.success).toBe(false)
+  })
+
+  it("rejects an empty daysOfWeek array", () => {
+    const result = CreateScheduleForDomainSchema.safeParse({
+      domain: "example.com",
+      startTime: "09:00",
+      endTime: "17:00",
+      daysOfWeek: [],
+    })
+    expect(result.success).toBe(false)
+  })
+
+  it("rejects a missing domain", () => {
+    const result = CreateScheduleForDomainSchema.safeParse({
       startTime: "09:00",
       endTime: "17:00",
       daysOfWeek: [1],
