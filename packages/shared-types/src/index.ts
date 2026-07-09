@@ -76,6 +76,16 @@ export const UpdateScheduleSchema = CreateScheduleSchema
   .omit({ timeLimitId: true })
   .partial()
 
+// Creates a schedule by domain rather than timeLimitId — used when the
+// caller doesn't yet know (or care) whether a TimeLimit exists for the
+// domain; the server resolves or creates the parent TimeLimit itself.
+export const CreateScheduleForDomainSchema = z.object({
+  domain: Domain,
+  startTime: HHMMTime,
+  endTime: HHMMTime,
+  daysOfWeek: z.array(DayOfWeek).min(1, "At least one day required"),
+})
+
 // ---------------------------------------------------------------------------
 // AI structured-output schemas — natural language → relational block records
 // ---------------------------------------------------------------------------
@@ -183,6 +193,7 @@ export type CreateTimeLimit = z.infer<typeof CreateTimeLimitSchema>
 export type UpdateTimeLimit = z.infer<typeof UpdateTimeLimitSchema>
 export type CreateSchedule = z.infer<typeof CreateScheduleSchema>
 export type UpdateSchedule = z.infer<typeof UpdateScheduleSchema>
+export type CreateScheduleForDomain = z.infer<typeof CreateScheduleForDomainSchema>
 export type AIScheduleBlock = z.infer<typeof AIScheduleBlockSchema>
 export type AIScheduleParseResult = z.infer<typeof AIScheduleParseResultSchema>
 export type AIScheduleParseRequest = z.infer<typeof AIScheduleParseRequestSchema>

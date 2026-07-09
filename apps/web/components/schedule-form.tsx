@@ -10,7 +10,7 @@ import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { TimeSelect } from "@/components/time-select"
 import { cn } from "@/lib/utils"
-import { createSchedule } from "@/lib/actions/schedules"
+import { createScheduleForDomain } from "@/lib/actions/schedules"
 
 const DAYS = [
   { label: "S", value: 0, full: "Sunday" },
@@ -55,14 +55,21 @@ export function ScheduleForm({ timeLimits }: ScheduleFormProps) {
   })
 
   async function onSubmit(data: FormValues) {
-    const timeLimit = timeLimits.find((t) => t.domain === data.domain)
-    if (!timeLimit) {
-      setError("domain", { message: "Website not found in your blocked list" })
+    setIsPending(true)
+    const result = await createScheduleForDomain({
+      domain: data.domain,
+      startTime: data.startTime,
+      endTime: data.endTime,
+      daysOfWeek: data.daysOfWeek,
+    })
+    setIsPending(false)
+
+    if (!result.success) {
+      const message =
+        typeof result.error === "string" ? result.error : "Could not save this schedule"
+      setError("domain", { message })
       return
     }
-    setIsPending(true)
-    await createSchedule({ timeLimitId: timeLimit.id, startTime: data.startTime, endTime: data.endTime, daysOfWeek: data.daysOfWeek })
-    setIsPending(false)
     reset()
   }
 
