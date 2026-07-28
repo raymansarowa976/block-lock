@@ -131,11 +131,22 @@ export async function deleteTimeLimit(id: string) {
   const hardLockError = await checkHardLock(userId, id)
   if (hardLockError) return hardLockError
 
-  await prisma.$transaction(async (tx) => {
-    const existing = await tx.timeLimit.findUnique({ where: { id } })
-    if (!existing || existing.userId !== userId) throw new Error("Not found")
-    await tx.timeLimit.delete({ where: { id } })
-  })
+  try {
+    await prisma.$transaction(async (tx) => {
+      const existing = await tx.timeLimit.findUnique({ where: { id } })
+      if (!existing) return
+      if (existing.userId !== userId) throw new Error("Not found")
+      await tx.timeLimit.delete({ where: { id } })
+    })
+  } catch (err) {
+    // A duplicate in-flight delete request for the same rule (e.g. a
+    // double-click) can delete the row between our existence check and the
+    // delete call. Treat that race as a no-op success instead of surfacing
+    // an error for a rule that is, correctly, already gone.
+    const isAlreadyDeleted =
+      err instanceof Prisma.PrismaClientKnownRequestError && err.code === "P2025"
+    if (!isAlreadyDeleted) throw err
+  }
 
   await redis.del(`user:rules:${userId}`)
   revalidatePath("/dashboard")

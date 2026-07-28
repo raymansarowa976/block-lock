@@ -200,6 +200,7 @@ export function ActiveRulesList({ timeLimits }: ActiveRulesListProps) {
                     variant="ghost"
                     size="icon-xs"
                     onClick={() => handleToggle(rule.id)}
+                    disabled={pendingToggles.has(rule.id) || pendingDeletes.has(rule.id)}
                     title={rule.isActive ? "Pause rule" : "Enable rule"}
                     aria-label={rule.isActive ? "Pause rule" : "Enable rule"}
                     className="text-slate-400 hover:text-slate-600"
@@ -210,6 +211,7 @@ export function ActiveRulesList({ timeLimits }: ActiveRulesListProps) {
                     variant="ghost"
                     size="icon-xs"
                     onClick={() => handleDelete(rule.id)}
+                    disabled={pendingDeletes.has(rule.id)}
                     title={`Delete ${rule.domain}`}
                     aria-label={`Delete ${rule.domain}`}
                     className="text-slate-400 hover:bg-red-50 hover:text-red-600"
