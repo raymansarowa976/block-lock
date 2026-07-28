@@ -104,6 +104,44 @@ describe("ActiveRulesList — optimistic updates", () => {
     expect(consoleError).not.toHaveBeenCalled()
     consoleError.mockRestore()
   })
+
+  it("disables the delete button once a delete is in flight, preventing a duplicate request", async () => {
+    // Regression test: double-clicking delete used to fire two concurrent
+    // deleteTimeLimit calls for the same rule. The row disappears from view
+    // (and its button is disabled) as soon as the first click is handled, so
+    // a second click can't reach handleDelete at all.
+    let resolveDelete!: (v: { success: true }) => void
+    mockDelete.mockReturnValue(new Promise((resolve) => { resolveDelete = resolve }))
+    const rules = [makeRule()]
+    render(<ActiveRulesList timeLimits={rules} />)
+
+    const deleteButton = screen.getByRole("button", { name: /delete example.com/i })
+    await userEvent.click(deleteButton)
+
+    expect(mockDelete).toHaveBeenCalledTimes(1)
+    expect(screen.queryByRole("button", { name: /delete example.com/i })).not.toBeInTheDocument()
+
+    resolveDelete({ success: true })
+    await waitFor(() => {
+      expect(mockNotify).toHaveBeenCalled()
+    })
+    expect(mockDelete).toHaveBeenCalledTimes(1)
+  })
+
+  it("does not show an error when the server reports a duplicate delete as an already-applied success", async () => {
+    // Even if a duplicate request did reach the server, lib/actions/time-limits.ts
+    // now treats "record already deleted" as a no-op success (see
+    // __tests__/actions/time-limits.test.ts), so the client should never see
+    // an error for this case.
+    mockDelete.mockResolvedValue({ success: true })
+    const rules = [makeRule()]
+    render(<ActiveRulesList timeLimits={rules} />)
+    await userEvent.click(screen.getByRole("button", { name: /delete example.com/i }))
+    await waitFor(() => {
+      expect(mockDelete).toHaveBeenCalled()
+    })
+    expect(screen.queryByRole("alert")).not.toBeInTheDocument()
+  })
 })
 
 describe("ActiveRulesList — extension sync notifications", () => {

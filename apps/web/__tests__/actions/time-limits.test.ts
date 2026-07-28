@@ -19,12 +19,19 @@ vi.mock("next/cache", () => ({ revalidatePath: vi.fn() }))
 vi.mock("@/lib/redis", () => ({ redis: { del: vi.fn() } }))
 vi.mock("@prisma/client", () => ({
   Prisma: {
-    PrismaClientKnownRequestError: class extends Error { code = "" },
+    PrismaClientKnownRequestError: class extends Error {
+      code: string
+      constructor(message: string, { code }: { code: string }) {
+        super(message)
+        this.code = code
+      }
+    },
   },
 }))
 
 import { auth } from "@/auth"
 import { prisma } from "@/lib/prisma"
+import { Prisma } from "@prisma/client"
 import {
   createTimeLimit,
   updateTimeLimit,
@@ -179,10 +186,12 @@ describe("deleteTimeLimit", () => {
     await expect(deleteTimeLimit(LIMIT_ID)).rejects.toThrow()
   })
 
-  it("rejects deletion when time limit does not exist", async () => {
+  it("treats deleting an already-gone time limit as a no-op success", async () => {
     mockAuth.mockResolvedValue(AUTHED_SESSION)
     mockPrisma.timeLimit.findUnique.mockResolvedValue(null)
-    await expect(deleteTimeLimit(LIMIT_ID)).rejects.toThrow()
+    const result = await deleteTimeLimit(LIMIT_ID)
+    expect(result).toEqual({ success: true })
+    expect(mockPrisma.timeLimit.delete).not.toHaveBeenCalled()
   })
 
   it("deletes the time limit and returns success for the owner", async () => {
@@ -193,5 +202,22 @@ describe("deleteTimeLimit", () => {
     const result = await deleteTimeLimit(LIMIT_ID)
     expect(result).toEqual({ success: true })
     expect(mockPrisma.timeLimit.delete).toHaveBeenCalledWith({ where: { id: LIMIT_ID } })
+  })
+
+  it("treats a concurrent duplicate delete request as a no-op success instead of an error", async () => {
+    // Simulates two in-flight delete requests for the same rule (e.g. a
+    // double-click): both pass the existence check, but by the time the
+    // second one calls tx.timeLimit.delete() the row is already gone and
+    // Prisma throws P2025 ("record to delete does not exist").
+    mockAuth.mockResolvedValue(AUTHED_SESSION)
+    mockPrisma.timeLimit.findUnique.mockResolvedValue(makeTimeLimit())
+    const raceError = new Prisma.PrismaClientKnownRequestError("No record was found for a delete.", {
+      code: "P2025",
+      clientVersion: "test",
+    })
+    mockPrisma.timeLimit.delete.mockRejectedValue(raceError)
+
+    const result = await deleteTimeLimit(LIMIT_ID)
+    expect(result).toEqual({ success: true })
   })
 })
