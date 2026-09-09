@@ -58,5 +58,5 @@ export async function syncRules(): Promise<void> {
   if (!res.ok) return
 
   const payload: SyncPayload = await res.json()
-  await applyBlockRules(payload.rules)
+  await applyBlockRules(payload.rules, payload.schedules)
 }
