@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from "vitest"
-import type { TimeLimit } from "@block-lock/shared-types"
+import type { TimeLimit, Schedule } from "@block-lock/shared-types"
 
 const { mockApplyBlockRules } = vi.hoisted(() => ({ mockApplyBlockRules: vi.fn() }))
 vi.mock("../src/rule-engine", () => ({
@@ -49,6 +49,19 @@ function makeRule(overrides: Partial<TimeLimit> = {}): TimeLimit {
   }
 }
 
+function makeSchedule(overrides: Partial<Schedule> = {}): Schedule {
+  return {
+    id: "sched-1",
+    timeLimitId: "rid-1",
+    startTime: "09:00",
+    endTime: "17:00",
+    daysOfWeek: [1, 2, 3, 4, 5],
+    createdAt: new Date(),
+    updatedAt: new Date(),
+    ...overrides,
+  }
+}
+
 // ---------------------------------------------------------------------------
 // registerUsageTickAlarm
 // ---------------------------------------------------------------------------
@@ -61,51 +74,93 @@ describe("registerUsageTickAlarm", () => {
 })
 
 // ---------------------------------------------------------------------------
-// handleUsageTick – no-op cases
+// handleUsageTick – reapplies block rules every tick (schedule enforcement)
 // ---------------------------------------------------------------------------
 
-describe("handleUsageTick – no-op cases", () => {
-  it("does nothing when there are no stored rules", async () => {
+describe("handleUsageTick – reapplying block rules for schedule boundary enforcement", () => {
+  it("does nothing at all when there are no stored rules", async () => {
     mockStorageGet.mockResolvedValue({ rules: [] })
     await handleUsageTick(new Date(2026, 5, 3))
     expect(mockTabsQuery).not.toHaveBeenCalled()
     expect(mockApplyBlockRules).not.toHaveBeenCalled()
   })
 
-  it("does nothing when no rule has a dailyLimit set", async () => {
+  it("reapplies block rules every tick even when no rule has a dailyLimit (schedule-only rule)", async () => {
+    const rules = [makeRule({ dailyLimit: null })]
+    mockStorageGet.mockResolvedValue({ rules })
+    const now = new Date(2026, 5, 3)
+    await handleUsageTick(now)
+    expect(mockApplyBlockRules).toHaveBeenCalledWith(rules, [], now)
+  })
+
+  it("reapplies block rules every tick even when there is no active tab", async () => {
+    const rules = [makeRule()]
+    mockStorageGet.mockResolvedValue({ rules })
+    mockTabsQuery.mockResolvedValue([])
+    const now = new Date(2026, 5, 3)
+    await handleUsageTick(now)
+    expect(mockApplyBlockRules).toHaveBeenCalledWith(rules, [], now)
+  })
+
+  it("threads the stored schedules through to applyBlockRules", async () => {
+    const rules = [makeRule({ dailyLimit: null })]
+    const schedules = [makeSchedule()]
+    mockStorageGet.mockResolvedValue({ rules, schedules })
+    const now = new Date(2026, 5, 3)
+    await handleUsageTick(now)
+    expect(mockApplyBlockRules).toHaveBeenCalledWith(rules, schedules, now)
+  })
+
+  it("defaults to an empty schedules array when none are stored", async () => {
+    mockStorageGet.mockResolvedValue({ rules: [makeRule({ dailyLimit: null })] })
+    await handleUsageTick(new Date(2026, 5, 3))
+    const [, schedulesArg] = mockApplyBlockRules.mock.calls[0]
+    expect(schedulesArg).toEqual([])
+  })
+})
+
+// ---------------------------------------------------------------------------
+// handleUsageTick – active-tab usage tracking only applies to dailyLimit rules
+// ---------------------------------------------------------------------------
+
+describe("handleUsageTick – active-tab usage tracking scope", () => {
+  it("does not query tabs when no rule has a dailyLimit set", async () => {
     mockStorageGet.mockResolvedValue({ rules: [makeRule({ dailyLimit: null })] })
     await handleUsageTick(new Date(2026, 5, 3))
     expect(mockTabsQuery).not.toHaveBeenCalled()
-    expect(mockApplyBlockRules).not.toHaveBeenCalled()
   })
 
-  it("does nothing when the only dailyLimit rule is inactive", async () => {
+  it("does not query tabs when the only dailyLimit rule is inactive", async () => {
     mockStorageGet.mockResolvedValue({ rules: [makeRule({ isActive: false })] })
     await handleUsageTick(new Date(2026, 5, 3))
     expect(mockTabsQuery).not.toHaveBeenCalled()
-    expect(mockApplyBlockRules).not.toHaveBeenCalled()
   })
 
-  it("does nothing when there is no active tab", async () => {
+  it("queries the active tab in the last focused window when a rule has a dailyLimit set", async () => {
+    mockStorageGet.mockResolvedValue({ rules: [makeRule()] })
+    mockTabsQuery.mockResolvedValue([{ url: "https://example.com/path" }])
+    await handleUsageTick(new Date(2026, 5, 3))
+    expect(mockTabsQuery).toHaveBeenCalledWith({ active: true, lastFocusedWindow: true })
+  })
+
+  it("does not record usage when there is no active tab", async () => {
     mockStorageGet.mockResolvedValue({ rules: [makeRule()] })
     mockTabsQuery.mockResolvedValue([])
     await handleUsageTick(new Date(2026, 5, 3))
     expect(mockStorageSet).not.toHaveBeenCalled()
-    expect(mockApplyBlockRules).not.toHaveBeenCalled()
   })
 
-  it("does nothing when the active tab has no URL", async () => {
+  it("does not record usage when the active tab has no URL", async () => {
     mockStorageGet.mockResolvedValue({ rules: [makeRule()] })
     mockTabsQuery.mockResolvedValue([{ url: undefined }])
     await handleUsageTick(new Date(2026, 5, 3))
-    expect(mockApplyBlockRules).not.toHaveBeenCalled()
+    expect(mockStorageSet).not.toHaveBeenCalled()
   })
 
-  it("does nothing when the active tab's domain does not match any limited rule", async () => {
+  it("does not record usage when the active tab's domain does not match any limited rule", async () => {
     mockStorageGet.mockResolvedValue({ rules: [makeRule({ domain: "example.com" })] })
     mockTabsQuery.mockResolvedValue([{ url: "https://unrelated.com/" }])
     await handleUsageTick(new Date(2026, 5, 3))
-    expect(mockApplyBlockRules).not.toHaveBeenCalled()
     expect(mockStorageSet).not.toHaveBeenCalled()
   })
 })
@@ -115,13 +170,6 @@ describe("handleUsageTick – no-op cases", () => {
 // ---------------------------------------------------------------------------
 
 describe("handleUsageTick – recording usage against the active tab's domain", () => {
-  it("queries the active tab in the last focused window", async () => {
-    mockStorageGet.mockResolvedValue({ rules: [makeRule()] })
-    mockTabsQuery.mockResolvedValue([{ url: "https://example.com/path" }])
-    await handleUsageTick(new Date(2026, 5, 3))
-    expect(mockTabsQuery).toHaveBeenCalledWith({ active: true, lastFocusedWindow: true })
-  })
-
   it("records one minute of usage for the matching domain", async () => {
     mockStorageGet.mockResolvedValue({ rules: [makeRule({ domain: "example.com" })] })
     mockTabsQuery.mockResolvedValue([{ url: "https://example.com/path" }])
@@ -144,14 +192,15 @@ describe("handleUsageTick – recording usage against the active tab's domain", 
     const rules = [makeRule({ domain: "example.com" })]
     mockStorageGet.mockResolvedValue({ rules })
     mockTabsQuery.mockResolvedValue([{ url: "https://example.com/path" }])
-    await handleUsageTick(new Date(2026, 5, 3))
-    expect(mockApplyBlockRules).toHaveBeenCalledWith(rules)
+    const now = new Date(2026, 5, 3)
+    await handleUsageTick(now)
+    expect(mockApplyBlockRules).toHaveBeenCalledWith(rules, [], now)
   })
 
   it("accumulates onto existing same-day usage rather than overwriting it", async () => {
-    mockStorageGet.mockImplementation((key: string) => {
-      if (key === "rules") return Promise.resolve({ rules: [makeRule({ domain: "example.com" })] })
-      return Promise.resolve({ dailyUsage: { "example.com": { date: "2026-06-03", minutesUsed: 4 } } })
+    mockStorageGet.mockResolvedValue({
+      rules: [makeRule({ domain: "example.com" })],
+      dailyUsage: { "example.com": { date: "2026-06-03", minutesUsed: 4 } },
     })
     mockTabsQuery.mockResolvedValue([{ url: "https://example.com/path" }])
     await handleUsageTick(new Date(2026, 5, 3))

@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from "vitest"
-import type { TimeLimit } from "@block-lock/shared-types"
+import type { TimeLimit, Schedule } from "@block-lock/shared-types"
 import { applyBlockRules } from "../src/rule-engine"
 
 const mockGetDynamicRules = vi.fn()
@@ -215,6 +215,119 @@ describe("applyBlockRules – domains with a dailyLimit are reachable until the 
       dailyUsage: { "example.com": { date: todayKey(yesterday), minutesUsed: 999 } },
     })
     await applyBlockRules([makeRule("example.com", { dailyLimit: 20 })])
+    const { addRules } = mockUpdateDynamicRules.mock.calls[0][0]
+    expect(addRules).toHaveLength(0)
+  })
+})
+
+// ---------------------------------------------------------------------------
+// Schedule window enforcement
+// ---------------------------------------------------------------------------
+
+function makeSchedule(timeLimitId: string, overrides: Partial<Schedule> = {}): Schedule {
+  return {
+    id: "sched-1",
+    timeLimitId,
+    startTime: "09:00",
+    endTime: "17:00",
+    daysOfWeek: [1, 2, 3, 4, 5], // Mon–Fri
+    createdAt: new Date(),
+    updatedAt: new Date(),
+    ...overrides,
+  }
+}
+
+// Wednesday 2026-06-03
+const WED_NOON = new Date(2026, 5, 3, 12, 0)
+const WED_LATE_NIGHT = new Date(2026, 5, 3, 22, 0)
+// Saturday 2026-06-06
+const SAT_NOON = new Date(2026, 5, 6, 12, 0)
+
+describe("applyBlockRules – a scheduled rule only blocks during its window", () => {
+  it("blocks the domain when now falls inside the schedule's day/time window", async () => {
+    const rule = makeRule("example.com", { id: "tl-1", dailyLimit: null })
+    await applyBlockRules([rule], [makeSchedule("tl-1")], WED_NOON)
+    const { addRules } = mockUpdateDynamicRules.mock.calls[0][0]
+    expect(addRules).toHaveLength(1)
+  })
+
+  it("does not block the domain when now falls outside the schedule's time window", async () => {
+    const rule = makeRule("example.com", { id: "tl-1", dailyLimit: null })
+    await applyBlockRules([rule], [makeSchedule("tl-1")], WED_LATE_NIGHT)
+    const { addRules } = mockUpdateDynamicRules.mock.calls[0][0]
+    expect(addRules).toHaveLength(0)
+  })
+
+  it("does not block the domain when now falls on a day not in daysOfWeek", async () => {
+    const rule = makeRule("example.com", { id: "tl-1", dailyLimit: null })
+    await applyBlockRules([rule], [makeSchedule("tl-1")], SAT_NOON)
+    const { addRules } = mockUpdateDynamicRules.mock.calls[0][0]
+    expect(addRules).toHaveLength(0)
+  })
+
+  it("does not block outside the window even when the rule has no dailyLimit (unconditional block is scoped by the schedule)", async () => {
+    const rule = makeRule("example.com", { id: "tl-1", dailyLimit: null })
+    await applyBlockRules([rule], [makeSchedule("tl-1")], WED_LATE_NIGHT)
+    const { addRules } = mockUpdateDynamicRules.mock.calls[0][0]
+    expect(addRules).toHaveLength(0)
+  })
+
+  it("blocks when any one of several schedules on the rule matches", async () => {
+    const rule = makeRule("example.com", { id: "tl-1", dailyLimit: null })
+    const schedules = [
+      makeSchedule("tl-1", { daysOfWeek: [6] }), // Saturday only
+      makeSchedule("tl-1", { daysOfWeek: [1, 2, 3, 4, 5] }), // weekdays
+    ]
+    await applyBlockRules([rule], schedules, WED_NOON)
+    const { addRules } = mockUpdateDynamicRules.mock.calls[0][0]
+    expect(addRules).toHaveLength(1)
+  })
+
+  it("ignores schedules belonging to a different rule's timeLimitId", async () => {
+    const rule = makeRule("example.com", { id: "tl-1", dailyLimit: null })
+    const otherRulesSchedule = makeSchedule("tl-other")
+    await applyBlockRules([rule], [otherRulesSchedule], WED_NOON)
+    const { addRules } = mockUpdateDynamicRules.mock.calls[0][0]
+    // tl-1 has no schedules of its own, so it falls back to unconditional dailyLimit===null blocking
+    expect(addRules).toHaveLength(1)
+  })
+
+  it("a rule with no schedules at all is unaffected by time of day (existing dailyLimit-only behaviour)", async () => {
+    mockStorageGet.mockResolvedValue({})
+    const rule = makeRule("example.com", { id: "tl-1", dailyLimit: 20 })
+    await applyBlockRules([rule], [], WED_LATE_NIGHT)
+    const { addRules } = mockUpdateDynamicRules.mock.calls[0][0]
+    expect(addRules).toHaveLength(0) // no usage recorded yet, so still under budget
+  })
+})
+
+describe("applyBlockRules – schedule window combined with dailyLimit budget", () => {
+  it("does not block inside the window when usage is still under the dailyLimit", async () => {
+    mockStorageGet.mockResolvedValue({
+      dailyUsage: { "example.com": { date: todayKey(WED_NOON), minutesUsed: 5 } },
+    })
+    const rule = makeRule("example.com", { id: "tl-1", dailyLimit: 20 })
+    await applyBlockRules([rule], [makeSchedule("tl-1")], WED_NOON)
+    const { addRules } = mockUpdateDynamicRules.mock.calls[0][0]
+    expect(addRules).toHaveLength(0)
+  })
+
+  it("blocks inside the window once the dailyLimit budget is exhausted", async () => {
+    mockStorageGet.mockResolvedValue({
+      dailyUsage: { "example.com": { date: todayKey(WED_NOON), minutesUsed: 20 } },
+    })
+    const rule = makeRule("example.com", { id: "tl-1", dailyLimit: 20 })
+    await applyBlockRules([rule], [makeSchedule("tl-1")], WED_NOON)
+    const { addRules } = mockUpdateDynamicRules.mock.calls[0][0]
+    expect(addRules).toHaveLength(1)
+  })
+
+  it("does not block outside the window even when the dailyLimit budget is exhausted", async () => {
+    mockStorageGet.mockResolvedValue({
+      dailyUsage: { "example.com": { date: todayKey(WED_LATE_NIGHT), minutesUsed: 999 } },
+    })
+    const rule = makeRule("example.com", { id: "tl-1", dailyLimit: 20 })
+    await applyBlockRules([rule], [makeSchedule("tl-1")], WED_LATE_NIGHT)
     const { addRules } = mockUpdateDynamicRules.mock.calls[0][0]
     expect(addRules).toHaveLength(0)
   })
