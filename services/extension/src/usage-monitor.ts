@@ -1,4 +1,4 @@
-import type { TimeLimit } from "@block-lock/shared-types"
+import type { TimeLimit, Schedule } from "@block-lock/shared-types"
 import { sanitiseDomain } from "./sanitise-domain"
 import { addUsageMinutes } from "./usage-tracker"
 import { applyBlockRules } from "./rule-engine"
@@ -18,9 +18,7 @@ function extractHostname(url: string): string | null {
   }
 }
 
-export async function handleUsageTick(now: Date = new Date()): Promise<void> {
-  const { rules } = await chrome.storage.local.get("rules")
-  const activeRules: TimeLimit[] = rules ?? []
+async function recordActiveTabUsage(activeRules: TimeLimit[], now: Date): Promise<void> {
   const limited = activeRules.filter((r) => r.isActive && r.dailyLimit !== null)
   if (limited.length === 0) return
 
@@ -33,5 +31,15 @@ export async function handleUsageTick(now: Date = new Date()): Promise<void> {
   if (!rule) return
 
   await addUsageMinutes(domain, 1, now)
-  await applyBlockRules(activeRules)
+}
+
+export async function handleUsageTick(now: Date = new Date()): Promise<void> {
+  const { rules, schedules } = await chrome.storage.local.get(["rules", "schedules"])
+  const activeRules: TimeLimit[] = rules ?? []
+  if (activeRules.length === 0) return
+
+  const activeSchedules: Schedule[] = schedules ?? []
+
+  await recordActiveTabUsage(activeRules, now)
+  await applyBlockRules(activeRules, activeSchedules, now)
 }

@@ -1,19 +1,44 @@
-import type { TimeLimit } from "@block-lock/shared-types"
+import type { TimeLimit, Schedule } from "@block-lock/shared-types"
 import { sanitiseDomain } from "./sanitise-domain"
 import { getMinutesUsedToday } from "./usage-tracker"
+import { isWithinAnySchedule } from "./schedule-window"
 
-async function resolveBlockedDomain(rule: TimeLimit): Promise<string | null> {
+function groupSchedulesByRule(schedules: Schedule[]): Map<string, Schedule[]> {
+  const byRuleId = new Map<string, Schedule[]>()
+  for (const schedule of schedules) {
+    const list = byRuleId.get(schedule.timeLimitId) ?? []
+    list.push(schedule)
+    byRuleId.set(schedule.timeLimitId, list)
+  }
+  return byRuleId
+}
+
+async function resolveBlockedDomain(
+  rule: TimeLimit,
+  schedulesByRule: Map<string, Schedule[]>,
+  now: Date,
+): Promise<string | null> {
   const domain = sanitiseDomain(rule.domain)
   if (domain === null) return null
+
+  const schedules = schedulesByRule.get(rule.id) ?? []
+  if (schedules.length > 0 && !isWithinAnySchedule(schedules, now)) return null
+
   if (rule.dailyLimit === null) return domain
 
-  const minutesUsed = await getMinutesUsedToday(domain)
+  const minutesUsed = await getMinutesUsedToday(domain, now)
   return minutesUsed >= rule.dailyLimit ? domain : null
 }
 
-export async function applyBlockRules(rules: TimeLimit[]): Promise<void> {
+export async function applyBlockRules(
+  rules: TimeLimit[],
+  schedules: Schedule[] = [],
+  now: Date = new Date(),
+): Promise<void> {
+  const schedulesByRule = groupSchedulesByRule(schedules)
+
   const resolved = await Promise.all(
-    rules.filter((r) => r.isActive).map(resolveBlockedDomain),
+    rules.filter((r) => r.isActive).map((r) => resolveBlockedDomain(r, schedulesByRule, now)),
   )
   const domains = resolved.filter((d): d is string => d !== null)
 
@@ -38,5 +63,5 @@ export async function applyBlockRules(rules: TimeLimit[]): Promise<void> {
     addRules,
   })
 
-  await chrome.storage.local.set({ lastSync: new Date().toISOString(), rules })
+  await chrome.storage.local.set({ lastSync: new Date().toISOString(), rules, schedules })
 }
