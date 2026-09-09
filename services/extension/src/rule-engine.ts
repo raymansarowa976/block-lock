@@ -1,13 +1,23 @@
-import type { SyncPayload, TimeLimit } from "@block-lock/shared-types"
+import type { TimeLimit } from "@block-lock/shared-types"
 import { sanitiseDomain } from "./sanitise-domain"
+import { getMinutesUsedToday } from "./usage-tracker"
 
-export async function applyBlockRules(payload: SyncPayload): Promise<void> {
-  const domains = payload.rules
-    .filter((r: TimeLimit) => r.isActive)
-    .map((r: TimeLimit) => sanitiseDomain(r.domain))
-    .filter((d: string | null): d is string => d !== null)
+async function resolveBlockedDomain(rule: TimeLimit): Promise<string | null> {
+  const domain = sanitiseDomain(rule.domain)
+  if (domain === null) return null
+  if (rule.dailyLimit === null) return domain
 
-  const rules = domains.map((domain: string, index: number) => ({
+  const minutesUsed = await getMinutesUsedToday(domain)
+  return minutesUsed >= rule.dailyLimit ? domain : null
+}
+
+export async function applyBlockRules(rules: TimeLimit[]): Promise<void> {
+  const resolved = await Promise.all(
+    rules.filter((r) => r.isActive).map(resolveBlockedDomain),
+  )
+  const domains = resolved.filter((d): d is string => d !== null)
+
+  const addRules = domains.map((domain, index) => ({
     id: index + 1,
     priority: 1,
     action: {
@@ -25,8 +35,8 @@ export async function applyBlockRules(payload: SyncPayload): Promise<void> {
 
   await chrome.declarativeNetRequest.updateDynamicRules({
     removeRuleIds: existingIds,
-    addRules: rules,
+    addRules,
   })
 
-  await chrome.storage.local.set({ lastSync: new Date().toISOString(), rules: payload.rules })
+  await chrome.storage.local.set({ lastSync: new Date().toISOString(), rules })
 }
