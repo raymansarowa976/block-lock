@@ -348,4 +348,29 @@ describe("createScheduleForDomain", () => {
     expect(mockPrisma.timeLimit.create).not.toHaveBeenCalled()
     expect(mockPrisma.schedule.create).not.toHaveBeenCalled()
   })
+
+  // Regression coverage for the bug where an unreachable Upstash host
+  // (getaddrinfo ENOTFOUND ...) made redis.del() reject, crashing the whole
+  // action even though the schedule had already been created in Postgres.
+  it("still returns success when redis.del rejects (Redis outage)", async () => {
+    mockAuth.mockResolvedValue(AUTHED_SESSION)
+    mockPrisma.timeLimit.findUnique.mockResolvedValue(null)
+    const createdTimeLimit = makeTimeLimit(USER_ID, { dailyLimit: DEFAULT_DAILY_LIMIT_MINUTES })
+    mockPrisma.timeLimit.create.mockResolvedValue(createdTimeLimit)
+    const createdSchedule = makeSchedule()
+    mockPrisma.schedule.create.mockResolvedValue(createdSchedule)
+
+    const { redis } = await import("@/lib/redis")
+    const mockRedis = redis as unknown as { del: ReturnType<typeof vi.fn> }
+    mockRedis.del.mockRejectedValueOnce(
+      new Error("getaddrinfo ENOTFOUND light-aardvark-72428.upstash.io"),
+    )
+
+    const result = await createScheduleForDomain(VALID_DOMAIN_INPUT)
+
+    expect(result).toEqual({
+      success: true,
+      data: { timeLimit: createdTimeLimit, schedule: createdSchedule },
+    })
+  })
 })

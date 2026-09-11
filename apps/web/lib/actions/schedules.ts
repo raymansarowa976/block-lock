@@ -17,6 +17,18 @@ async function requireUserId(): Promise<string> {
   return session.user.id
 }
 
+// Cache invalidation is best-effort: /api/sync's cache entries carry a
+// 5-minute TTL, so a failed eviction just means briefly stale rules — that's
+// far better than letting a Redis outage (e.g. DNS failure reaching Upstash)
+// fail a database write that already succeeded.
+async function invalidateRulesCache(userId: string): Promise<void> {
+  try {
+    await redis.del(`user:rules:${userId}`)
+  } catch (err) {
+    console.error("Failed to invalidate rules cache", err)
+  }
+}
+
 // A website that is unconditionally blocked (TimeLimit.dailyLimit === null)
 // cannot also have a schedule attached to it.
 async function checkNotBlocked(timeLimitId: string) {
@@ -51,7 +63,7 @@ export async function createSchedule(raw: unknown) {
     return tx.schedule.create({ data: parsed.data })
   })
 
-  await redis.del(`user:rules:${userId}`)
+  await invalidateRulesCache(userId)
   revalidatePath("/dashboard")
   return { success: true as const, data: schedule }
 }
@@ -98,7 +110,7 @@ export async function createScheduleForDomain(raw: unknown) {
     }
   }
 
-  await redis.del(`user:rules:${userId}`)
+  await invalidateRulesCache(userId)
   revalidatePath("/dashboard")
   return {
     success: true as const,
@@ -124,7 +136,7 @@ export async function updateSchedule(id: string, raw: unknown) {
     return tx.schedule.update({ where: { id }, data: parsed.data })
   })
 
-  await redis.del(`user:rules:${userId}`)
+  await invalidateRulesCache(userId)
   revalidatePath("/dashboard")
   return { success: true as const, data: schedule }
 }
@@ -142,7 +154,7 @@ export async function deleteSchedule(id: string) {
     await tx.schedule.delete({ where: { id } })
   })
 
-  await redis.del(`user:rules:${userId}`)
+  await invalidateRulesCache(userId)
   revalidatePath("/dashboard")
   return { success: true as const }
 }
