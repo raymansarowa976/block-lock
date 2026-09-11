@@ -31,7 +31,7 @@ describe("handleExternalMessage – origin validation", () => {
   it("responds with forbidden when the sender URL is not an allowed origin", async () => {
     const sendResponse = vi.fn()
     await handleExternalMessage(
-      { type: "BLOCK_LOCK_AUTH", userId: "user-123" },
+      { type: "BLOCK_LOCK_AUTH", userId: "user-123", token: "tok", expiresAt: 1 },
       { url: "https://evil.com/page" },
       sendResponse,
     )
@@ -40,7 +40,7 @@ describe("handleExternalMessage – origin validation", () => {
 
   it("does not write to storage when the origin is disallowed", async () => {
     await handleExternalMessage(
-      { type: "BLOCK_LOCK_AUTH", userId: "user-123" },
+      { type: "BLOCK_LOCK_AUTH", userId: "user-123", token: "tok", expiresAt: 1 },
       { url: "https://evil.com/page" },
       vi.fn(),
     )
@@ -51,7 +51,7 @@ describe("handleExternalMessage – origin validation", () => {
     mockStorageSet.mockResolvedValue(undefined)
     const sendResponse = vi.fn()
     await handleExternalMessage(
-      { type: "BLOCK_LOCK_AUTH", userId: "user-123" },
+      { type: "BLOCK_LOCK_AUTH", userId: "user-123", token: "tok", expiresAt: 1 },
       { url: "https://blocklock.app/dashboard" },
       sendResponse,
     )
@@ -61,7 +61,7 @@ describe("handleExternalMessage – origin validation", () => {
   it("rejects messages from the retired block-lock.vercel.app origin", async () => {
     const sendResponse = vi.fn()
     await handleExternalMessage(
-      { type: "BLOCK_LOCK_AUTH", userId: "user-123" },
+      { type: "BLOCK_LOCK_AUTH", userId: "user-123", token: "tok", expiresAt: 1 },
       { url: "https://block-lock.vercel.app/dashboard" },
       sendResponse,
     )
@@ -72,7 +72,7 @@ describe("handleExternalMessage – origin validation", () => {
     mockStorageSet.mockResolvedValue(undefined)
     const sendResponse = vi.fn()
     await handleExternalMessage(
-      { type: "BLOCK_LOCK_AUTH", userId: "user-123" },
+      { type: "BLOCK_LOCK_AUTH", userId: "user-123", token: "tok", expiresAt: 1 },
       { url: "http://localhost:3000/dashboard" },
       sendResponse,
     )
@@ -83,22 +83,26 @@ describe("handleExternalMessage – origin validation", () => {
 describe("handleExternalMessage – BLOCK_LOCK_AUTH", () => {
   const validSender = { url: "https://blocklock.app/dashboard" }
 
-  it("stores userId in chrome.storage.local", async () => {
+  it("stores userId, token and its expiry in chrome.storage.local", async () => {
     mockStorageSet.mockResolvedValue(undefined)
     await handleExternalMessage(
-      { type: "BLOCK_LOCK_AUTH", userId: "user-abc" },
+      { type: "BLOCK_LOCK_AUTH", userId: "user-abc", token: "signed.tok", expiresAt: 999 },
       validSender,
       vi.fn(),
     )
     expect(mockStorageSet).toHaveBeenCalledWith(
-      expect.objectContaining({ userId: "user-abc" }),
+      expect.objectContaining({
+        userId: "user-abc",
+        token: "signed.tok",
+        tokenExpiresAt: 999,
+      }),
     )
   })
 
   it("clears any previous authError when binding succeeds", async () => {
     mockStorageSet.mockResolvedValue(undefined)
     await handleExternalMessage(
-      { type: "BLOCK_LOCK_AUTH", userId: "user-abc" },
+      { type: "BLOCK_LOCK_AUTH", userId: "user-abc", token: "signed.tok", expiresAt: 999 },
       validSender,
       vi.fn(),
     )
@@ -111,18 +115,32 @@ describe("handleExternalMessage – BLOCK_LOCK_AUTH", () => {
     mockStorageSet.mockResolvedValue(undefined)
     const sendResponse = vi.fn()
     await handleExternalMessage(
-      { type: "BLOCK_LOCK_AUTH", userId: "user-abc" },
+      { type: "BLOCK_LOCK_AUTH", userId: "user-abc", token: "signed.tok", expiresAt: 999 },
       validSender,
       sendResponse,
     )
     expect(sendResponse).toHaveBeenCalledWith({ ok: true })
+  })
+
+  it("no longer accepts a bare userId as a usable credential — a token is required", async () => {
+    // Regression guard for the original bug: even if a caller only sends
+    // userId (old message shape), syncRules must not be able to authenticate
+    // with it since /api/sync now only accepts a signed token.
+    mockStorageSet.mockResolvedValue(undefined)
+    await handleExternalMessage(
+      { type: "BLOCK_LOCK_AUTH", userId: "user-abc", token: "signed.tok", expiresAt: 999 },
+      validSender,
+      vi.fn(),
+    )
+    const [storedState] = mockStorageSet.mock.calls[0]
+    expect(storedState.token).toBeTruthy()
   })
 })
 
 describe("handleExternalMessage – BLOCK_LOCK_SIGNOUT", () => {
   const validSender = { url: "https://blocklock.app/dashboard" }
 
-  it("clears userId, authError and lastSync from storage", async () => {
+  it("clears userId, token, tokenExpiresAt, authError and lastSync from storage", async () => {
     mockStorageSet.mockResolvedValue(undefined)
     await handleExternalMessage(
       { type: "BLOCK_LOCK_SIGNOUT" },
@@ -131,6 +149,8 @@ describe("handleExternalMessage – BLOCK_LOCK_SIGNOUT", () => {
     )
     expect(mockStorageSet).toHaveBeenCalledWith({
       userId: null,
+      token: null,
+      tokenExpiresAt: null,
       authError: null,
       lastSync: null,
     })
@@ -163,7 +183,7 @@ describe("handleExternalMessage – BLOCK_LOCK_RULES_UPDATED", () => {
   })
 
   it("immediately triggers a rule re-sync instead of waiting for the next alarm", async () => {
-    mockStorageGet.mockResolvedValue({ userId: "user-abc" })
+    mockStorageGet.mockResolvedValue({ token: "signed.tok", tokenExpiresAt: Date.now() + 60_000 })
     mockFetch.mockResolvedValue({ ok: false, status: 500 })
     await handleExternalMessage(
       { type: "BLOCK_LOCK_RULES_UPDATED" },
@@ -171,12 +191,12 @@ describe("handleExternalMessage – BLOCK_LOCK_RULES_UPDATED", () => {
       vi.fn(),
     )
     expect(mockFetch).toHaveBeenCalledWith(
-      expect.stringContaining("/sync?userId=user-abc"),
+      expect.stringContaining("/sync?token=signed.tok"),
     )
   })
 
   it("responds with { ok: true } once the sync has been dispatched", async () => {
-    mockStorageGet.mockResolvedValue({ userId: "user-abc" })
+    mockStorageGet.mockResolvedValue({ token: "signed.tok", tokenExpiresAt: Date.now() + 60_000 })
     mockFetch.mockResolvedValue({ ok: false, status: 500 })
     const sendResponse = vi.fn()
     await handleExternalMessage(
@@ -188,7 +208,7 @@ describe("handleExternalMessage – BLOCK_LOCK_RULES_UPDATED", () => {
   })
 
   it("dispatches the sync broadcast to the background script within 200ms", async () => {
-    mockStorageGet.mockResolvedValue({ userId: "user-abc" })
+    mockStorageGet.mockResolvedValue({ token: "signed.tok", tokenExpiresAt: Date.now() + 60_000 })
     mockFetch.mockResolvedValue({ ok: false, status: 500 })
     const start = performance.now()
     await handleExternalMessage(
@@ -206,36 +226,60 @@ describe("handleExternalMessage – BLOCK_LOCK_RULES_UPDATED", () => {
 // ---------------------------------------------------------------------------
 
 describe("syncRules – auth error handling", () => {
-  it("does nothing when no userId is stored", async () => {
+  it("does nothing when no token is stored", async () => {
     mockStorageGet.mockResolvedValue({})
     await syncRules()
     expect(mockFetch).not.toHaveBeenCalled()
   })
 
-  it("sets authError and clears userId when the API responds 401", async () => {
-    mockStorageGet.mockResolvedValue({ userId: "user-abc" })
+  it("requests /api/sync with the stored token, not a bare userId", async () => {
+    mockStorageGet.mockResolvedValue({ token: "signed.tok", tokenExpiresAt: Date.now() + 60_000 })
+    mockFetch.mockResolvedValue({ ok: false, status: 500 })
+    await syncRules()
+    expect(mockFetch).toHaveBeenCalledWith(expect.stringContaining("/sync?token=signed.tok"))
+    expect(mockFetch).not.toHaveBeenCalledWith(expect.stringContaining("userId="))
+  })
+
+  it("sets authError and clears the credential when the API responds 401", async () => {
+    mockStorageGet.mockResolvedValue({ token: "signed.tok", tokenExpiresAt: Date.now() + 60_000 })
     mockFetch.mockResolvedValue({ ok: false, status: 401 })
     await syncRules()
     expect(mockStorageSet).toHaveBeenCalledWith({
       authError: "session_expired",
       userId: null,
+      token: null,
+      tokenExpiresAt: null,
     })
   })
 
-  it("sets authError and clears userId when the API responds 403", async () => {
-    mockStorageGet.mockResolvedValue({ userId: "user-abc" })
+  it("sets authError and clears the credential when the API responds 403", async () => {
+    mockStorageGet.mockResolvedValue({ token: "signed.tok", tokenExpiresAt: Date.now() + 60_000 })
     mockFetch.mockResolvedValue({ ok: false, status: 403 })
     await syncRules()
     expect(mockStorageSet).toHaveBeenCalledWith({
       authError: "session_expired",
       userId: null,
+      token: null,
+      tokenExpiresAt: null,
     })
   })
 
   it("does not set authError for non-auth API failures (e.g. 500)", async () => {
-    mockStorageGet.mockResolvedValue({ userId: "user-abc" })
+    mockStorageGet.mockResolvedValue({ token: "signed.tok", tokenExpiresAt: Date.now() + 60_000 })
     mockFetch.mockResolvedValue({ ok: false, status: 500 })
     await syncRules()
     expect(mockStorageSet).not.toHaveBeenCalled()
+  })
+
+  it("sets authError and clears the credential locally, without a network call, once the stored token's expiry has passed", async () => {
+    mockStorageGet.mockResolvedValue({ token: "signed.tok", tokenExpiresAt: Date.now() - 1 })
+    await syncRules()
+    expect(mockFetch).not.toHaveBeenCalled()
+    expect(mockStorageSet).toHaveBeenCalledWith({
+      authError: "session_expired",
+      userId: null,
+      token: null,
+      tokenExpiresAt: null,
+    })
   })
 })
