@@ -185,4 +185,22 @@ describe("deleteUserAccount", () => {
     await deleteUserAccount("wrong@example.com")
     expect(mockPrisma.user.delete).not.toHaveBeenCalled()
   })
+
+  // Regression coverage for the bug where an unreachable Upstash host
+  // (getaddrinfo ENOTFOUND ...) made redis.del() reject, crashing the whole
+  // action even though the account had already been deleted from Postgres.
+  it("still returns success when redis.del rejects (Redis outage)", async () => {
+    mockAuth.mockResolvedValue(AUTHED_SESSION)
+    mockPrisma.user.findUnique.mockResolvedValue(makeUser())
+    mockPrisma.user.delete.mockResolvedValue(undefined)
+
+    const { redis } = await import("@/lib/redis")
+    const mockRedis = redis as unknown as { del: ReturnType<typeof vi.fn> }
+    mockRedis.del.mockRejectedValueOnce(
+      new Error("getaddrinfo ENOTFOUND light-aardvark-72428.upstash.io"),
+    )
+
+    const result = await deleteUserAccount(USER_EMAIL)
+    expect(result).toEqual({ success: true })
+  })
 })
