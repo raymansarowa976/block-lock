@@ -14,9 +14,11 @@ vi.mock("@/lib/prisma", () => ({
     timeLimit: { findMany: vi.fn() },
   },
 }))
+vi.mock("@/lib/sync-token", () => ({ verifySyncToken: vi.fn() }))
 
 import { redis } from "@/lib/redis"
 import { prisma } from "@/lib/prisma"
+import { verifySyncToken } from "@/lib/sync-token"
 import { GET } from "@/app/api/sync/route"
 
 const mockGet = redis.get as unknown as Mock
@@ -24,8 +26,10 @@ const mockSet = redis.set as unknown as Mock
 const mockFindMany = (
   prisma as unknown as { timeLimit: { findMany: Mock } }
 ).timeLimit.findMany
+const mockVerify = verifySyncToken as unknown as Mock
 
 const USER_ID = "clh3q5g0o0000qmij2z3m4n5k"
+const VALID_TOKEN = "valid.token"
 
 // Redis holds rule for "redis-domain.com".
 // @upstash/redis automatically deserializes JSON, so redis.get() resolves
@@ -58,12 +62,15 @@ const PRISMA_RULES = [{
 }]
 
 function syncRequest() {
-  return new Request(`http://localhost/api/sync?userId=${USER_ID}`)
+  return new Request(`http://localhost/api/sync?token=${VALID_TOKEN}`)
 }
 
 beforeEach(() => {
   vi.clearAllMocks()
   mockFindMany.mockResolvedValue(PRISMA_RULES)
+  mockVerify.mockImplementation((token: string) =>
+    token === VALID_TOKEN ? { userId: USER_ID } : null,
+  )
 })
 
 // ---------------------------------------------------------------------------

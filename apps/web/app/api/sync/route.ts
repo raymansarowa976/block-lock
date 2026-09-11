@@ -1,6 +1,7 @@
 import { prisma } from "@/lib/prisma"
 import { redis } from "@/lib/redis"
 import { corsHeaders, handleCorsPreflight } from "@/lib/cors"
+import { verifySyncToken } from "@/lib/sync-token"
 import { NextResponse } from "next/server"
 
 const CACHE_TTL_SECONDS = 300 // 5-minute TTL matches the extension's sync interval
@@ -16,11 +17,21 @@ export async function OPTIONS(request: Request) {
 export async function GET(request: Request) {
   const headers = corsHeaders(request.headers.get("origin")) ?? undefined
   const { searchParams } = new URL(request.url)
-  const userId = searchParams.get("userId")
+  const token = searchParams.get("token")
 
-  if (!userId) {
-    return NextResponse.json({ error: "Missing userId" }, { status: 400, headers })
+  if (!token) {
+    return NextResponse.json({ error: "Missing token" }, { status: 400, headers })
   }
+
+  // The token is a signed, short-lived credential minted from an authenticated
+  // dashboard session (see app/api/sync/token/route.ts) — a bare userId is no
+  // longer accepted, since that could be replayed indefinitely by anyone who
+  // had ever seen it.
+  const verified = verifySyncToken(token)
+  if (!verified) {
+    return NextResponse.json({ error: "Unauthorized" }, { status: 401, headers })
+  }
+  const userId = verified.userId
 
   // ── Cache read ──────────────────────────────────────────────────────────
   // @upstash/redis automatically deserializes JSON, so `cached` is already
