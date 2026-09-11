@@ -45,10 +45,28 @@ export function notifyExtensionRulesUpdated(): void {
   sendToExtension({ type: "BLOCK_LOCK_RULES_UPDATED" })
 }
 
+// Re-mint well inside the token's 15-minute lifetime (see lib/sync-token.ts)
+// so an open dashboard tab keeps handing the extension a fresh credential
+// and it never has to fall back to the session_expired popup state.
+const TOKEN_REFRESH_INTERVAL_MS = 5 * 60 * 1000
+
+async function bindExtension(userId: string): Promise<void> {
+  try {
+    const res = await fetch("/api/sync/token")
+    if (!res.ok) return
+    const { token, expiresAt } = (await res.json()) as { token: string; expiresAt: number }
+    sendToExtension({ type: "BLOCK_LOCK_AUTH", userId, token, expiresAt })
+  } catch {
+    // Network hiccup — the next refresh tick (or next mount) will retry
+  }
+}
+
 export function ExtensionBridge({ userId }: { userId: string }) {
   useEffect(() => {
     if (!userId) return
-    sendToExtension({ type: "BLOCK_LOCK_AUTH", userId })
+    bindExtension(userId)
+    const interval = setInterval(() => bindExtension(userId), TOKEN_REFRESH_INTERVAL_MS)
+    return () => clearInterval(interval)
   }, [userId])
 
   return null
