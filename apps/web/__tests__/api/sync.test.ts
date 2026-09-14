@@ -12,10 +12,12 @@ vi.mock("@/lib/prisma", () => ({
   },
 }))
 vi.mock("@/lib/sync-token", () => ({ verifySyncToken: vi.fn() }))
+vi.mock("@/lib/rate-limit", () => ({ rateLimit: vi.fn() }))
 
 import { redis } from "@/lib/redis"
 import { prisma } from "@/lib/prisma"
 import { verifySyncToken } from "@/lib/sync-token"
+import { rateLimit } from "@/lib/rate-limit"
 import { GET, OPTIONS } from "@/app/api/sync/route"
 
 const mockGet = redis.get as unknown as Mock
@@ -24,12 +26,16 @@ const mockFindMany = (
   prisma as unknown as { timeLimit: { findMany: Mock } }
 ).timeLimit.findMany
 const mockVerify = verifySyncToken as unknown as Mock
+const mockRateLimit = rateLimit as unknown as Mock
 
 const USER_ID = "clh3q5g0o0000qmij2z3m4n5k"
 const LIMIT_ID = "clh3q5g0o0001qmij2z3m4n5k"
 const SCHEDULE_ID = "clh3q5g0o0002qmij2z3m4n5k"
 const CACHE_KEY = `user:rules:${USER_ID}`
 const VALID_TOKEN = "valid.token"
+
+const RATE_ALLOWED = { allowed: true, remaining: 59, resetAt: Date.now() + 60_000 }
+const RATE_BLOCKED = { allowed: false, remaining: 0, resetAt: Date.now() + 60_000 }
 
 function makeTimeLimit(overrides: Record<string, unknown> = {}) {
   return {
@@ -95,6 +101,7 @@ beforeEach(() => {
   mockVerify.mockImplementation((token: string) =>
     token === VALID_TOKEN ? { userId: USER_ID } : null,
   )
+  mockRateLimit.mockResolvedValue(RATE_ALLOWED)
 })
 
 describe("GET /api/sync", () => {
@@ -115,6 +122,11 @@ describe("GET /api/sync", () => {
       await GET(syncRequest())
       expect(mockFindMany).not.toHaveBeenCalled()
     })
+
+    it("does not invoke the rate limiter when token is missing", async () => {
+      await GET(syncRequest())
+      expect(mockRateLimit).not.toHaveBeenCalled()
+    })
   })
 
   describe("invalid or expired token", () => {
@@ -133,10 +145,67 @@ describe("GET /api/sync", () => {
       expect(mockFindMany).not.toHaveBeenCalled()
     })
 
+    it("does not invoke the rate limiter when the token is invalid", async () => {
+      await GET(syncRequest("garbage"))
+      expect(mockRateLimit).not.toHaveBeenCalled()
+    })
+
     it("never trusts a raw userId passed instead of a token", async () => {
       // Regression guard: a bare cuid must not verify as a token.
       const res = await GET(syncRequest(USER_ID))
       expect(res.status).toBe(401)
+    })
+  })
+
+  // ── Rate limiting ─────────────────────────────────────────────────────────
+  // A valid token proves identity but not good intent — a leaked or replayed
+  // token can still be used to hammer this route into real Prisma reads and
+  // real Upstash writes, so the limiter runs right after verification, same
+  // as the session-authed routes.
+
+  describe("rate limiting", () => {
+    it("returns 429 when the rate limit is exceeded", async () => {
+      mockRateLimit.mockResolvedValue(RATE_BLOCKED)
+      const res = await GET(syncRequest(VALID_TOKEN))
+      expect(res.status).toBe(429)
+    })
+
+    it("does not touch Redis when the rate limit is exceeded", async () => {
+      mockRateLimit.mockResolvedValue(RATE_BLOCKED)
+      await GET(syncRequest(VALID_TOKEN))
+      expect(mockGet).not.toHaveBeenCalled()
+    })
+
+    it("does not touch Prisma when the rate limit is exceeded", async () => {
+      mockRateLimit.mockResolvedValue(RATE_BLOCKED)
+      await GET(syncRequest(VALID_TOKEN))
+      expect(mockFindMany).not.toHaveBeenCalled()
+    })
+
+    it("includes X-RateLimit-Remaining: 0 in the 429 response", async () => {
+      mockRateLimit.mockResolvedValue(RATE_BLOCKED)
+      const res = await GET(syncRequest(VALID_TOKEN))
+      expect(res.headers.get("X-RateLimit-Remaining")).toBe("0")
+    })
+
+    it("includes a positive Retry-After header in the 429 response", async () => {
+      mockRateLimit.mockResolvedValue(RATE_BLOCKED)
+      const res = await GET(syncRequest(VALID_TOKEN))
+      const retryAfter = Number(res.headers.get("Retry-After"))
+      expect(retryAfter).toBeGreaterThan(0)
+    })
+
+    it("scopes rate limiting to the token-verified userId", async () => {
+      mockGet.mockResolvedValue(CACHED_PAYLOAD)
+      await GET(syncRequest(VALID_TOKEN))
+      expect(mockRateLimit).toHaveBeenCalledWith(USER_ID)
+    })
+
+    it("sets CORS headers on a 429 response too, so the extension can read the rejection", async () => {
+      mockRateLimit.mockResolvedValue(RATE_BLOCKED)
+      const res = await GET(syncRequest(VALID_TOKEN, EXTENSION_ORIGIN))
+      expect(res.status).toBe(429)
+      expect(res.headers.get("Access-Control-Allow-Origin")).toBe(EXTENSION_ORIGIN)
     })
   })
 
