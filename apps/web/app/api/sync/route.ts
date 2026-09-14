@@ -27,8 +27,9 @@ export async function GET(request: Request) {
   // The token is a signed, short-lived credential minted from an authenticated
   // dashboard session (see app/api/sync/token/route.ts) — a bare userId is no
   // longer accepted, since that could be replayed indefinitely by anyone who
-  // had ever seen it.
-  const verified = verifySyncToken(token)
+  // had ever seen it. Verification also checks Redis for a sign-out
+  // revocation cutoff (see lib/sync-token.ts), hence the await.
+  const verified = await verifySyncToken(token)
   if (!verified) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401, headers })
   }

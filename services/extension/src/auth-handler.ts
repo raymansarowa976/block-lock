@@ -52,6 +52,20 @@ export async function handleExternalMessage(
   }
 
   if (message.type === "BLOCK_LOCK_SIGNOUT") {
+    // Best-effort server-side revocation — the extension has no dashboard
+    // session, only the token itself, so it authenticates the revoke call
+    // with that. Local state is cleared either way; a failed revoke just
+    // means the token rides out its own 15-minute TTL instead of dying
+    // immediately.
+    const { token } = await chrome.storage.local.get(["token"])
+    if (token) {
+      try {
+        await fetch(`${API_BASE}/sync/revoke?token=${token}`, { method: "POST" })
+      } catch {
+        // Network failure — proceed to clear local state regardless.
+      }
+    }
+
     await chrome.storage.local.set({ ...clearCredential(), authError: null, lastSync: null })
     sendResponse({ ok: true })
     return

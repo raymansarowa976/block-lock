@@ -166,6 +166,58 @@ describe("handleExternalMessage – BLOCK_LOCK_SIGNOUT", () => {
     )
     expect(sendResponse).toHaveBeenCalledWith({ ok: true })
   })
+
+  // ── Server-side revocation ────────────────────────────────────────────────
+  // A local-only sign-out leaves whatever credential the extension was
+  // holding valid server-side until it naturally expires. Signing out must
+  // also revoke it, the same way a dashboard sign-out does (see
+  // apps/web/lib/auth-events.ts).
+
+  describe("server-side token revocation", () => {
+    it("calls /api/sync/revoke with the stored token before clearing storage", async () => {
+      mockStorageGet.mockResolvedValue({ token: "signed.tok" })
+      mockFetch.mockResolvedValue({ ok: true, status: 200 })
+      await handleExternalMessage({ type: "BLOCK_LOCK_SIGNOUT" }, validSender, vi.fn())
+      expect(mockFetch).toHaveBeenCalledWith(
+        expect.stringContaining("/sync/revoke?token=signed.tok"),
+        expect.objectContaining({ method: "POST" }),
+      )
+    })
+
+    it("does not call fetch when there is no stored token to revoke", async () => {
+      mockStorageGet.mockResolvedValue({})
+      await handleExternalMessage({ type: "BLOCK_LOCK_SIGNOUT" }, validSender, vi.fn())
+      expect(mockFetch).not.toHaveBeenCalled()
+    })
+
+    it("still clears local storage and responds ok when the revoke call fails", async () => {
+      mockStorageGet.mockResolvedValue({ token: "signed.tok" })
+      mockFetch.mockRejectedValue(new Error("network failure"))
+      const sendResponse = vi.fn()
+      await handleExternalMessage({ type: "BLOCK_LOCK_SIGNOUT" }, validSender, sendResponse)
+      expect(mockStorageSet).toHaveBeenCalledWith({
+        userId: null,
+        token: null,
+        tokenExpiresAt: null,
+        authError: null,
+        lastSync: null,
+      })
+      expect(sendResponse).toHaveBeenCalledWith({ ok: true })
+    })
+
+    it("still clears local storage when the server rejects the revoke call", async () => {
+      mockStorageGet.mockResolvedValue({ token: "signed.tok" })
+      mockFetch.mockResolvedValue({ ok: false, status: 401 })
+      await handleExternalMessage({ type: "BLOCK_LOCK_SIGNOUT" }, validSender, vi.fn())
+      expect(mockStorageSet).toHaveBeenCalledWith({
+        userId: null,
+        token: null,
+        tokenExpiresAt: null,
+        authError: null,
+        lastSync: null,
+      })
+    })
+  })
 })
 
 describe("handleExternalMessage – BLOCK_LOCK_RULES_UPDATED", () => {

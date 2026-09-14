@@ -21,8 +21,9 @@ export async function POST(request: Request) {
   // Same short-lived, signed credential /api/sync verifies (see
   // lib/sync-token.ts) — a chrome-extension:// service-worker fetch is
   // cross-site, so the dashboard's session cookie never reaches this route
-  // and auth() would 401 on every flush.
-  const verified = verifySyncToken(token)
+  // and auth() would 401 on every flush. Verification also checks Redis for
+  // a sign-out revocation cutoff, hence the await.
+  const verified = await verifySyncToken(token)
   if (!verified) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401, headers })
   }
