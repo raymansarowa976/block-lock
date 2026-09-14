@@ -11,12 +11,12 @@ submission, P3 is architecture/cost cleanup, P4 is smaller hardening.
 
 ## P0 — Product doesn't do what it claims
 
-- [ ] **Extension never enforces `dailyLimit` (time budgets)**
+- [x] **Extension never enforces `dailyLimit` (time budgets)**
   - `services/extension/src/rule-engine.ts` only filters `payload.rules` by `isActive`; `dailyLimit` is read nowhere except display text in `blocked-page.tsx`.
   - No counter exists anywhere for minutes-used per domain per day, no reset-at-midnight, no re-block-on-budget-exhausted.
   - Acceptance: a domain with `dailyLimit: 20` is reachable for ~20 min/day, then blocked until the next day, without a manual sync.
 
-- [ ] **Extension never enforces schedules (time-of-day windows)**
+- [x] **Extension never enforces schedules (time-of-day windows)**
   - `payload.schedules` is fetched by `syncRules()` in `auth-handler.ts` but never read by `rule-engine.ts`. Server-side, `/api/sync` returns raw `TimeLimit` rows with no schedule-window filtering either.
   - Result: a domain scheduled "weekdays 9–17" is blocked 24/7 the instant `isActive` is true, or not blocked at all — schedules currently have zero effect on real browsing.
   - Acceptance: decide where "is this domain in-window right now" gets computed (service-worker `chrome.alarms` tick vs. server-computed at `/sync` time), then implement it so blocking actually turns on/off at the scheduled boundaries.
@@ -25,19 +25,19 @@ submission, P3 is architecture/cost cleanup, P4 is smaller hardening.
 
 ## P1 — Security: extension↔server auth is spoofable / broken
 
-- [ ] **`/api/sync` has no authentication — public IDOR on every user's block list**
+- [x] **`/api/sync` has no authentication — public IDOR on every user's block list**
   - `apps/web/app/api/sync/route.ts` never calls `auth()`; it trusts `?userId=<cuid>` as-is and returns that user's `TimeLimit`s + `Schedule`s.
   - CORS restricts *browser* callers to the extension's origin, but does nothing to stop a direct `curl https://blocklock.app/api/sync?userId=<any-cuid>`.
   - `userId` is a bare Prisma `cuid` handed to the extension once via `BLOCK_LOCK_AUTH` (`apps/web/components/extension-bridge.tsx`) and stored forever — it is not a session token and can't be revoked short of deleting the account.
   - Acceptance: replace the bare `userId` credential with a signed/short-lived token minted from an authenticated dashboard session; verify it server-side on `/api/sync`; add an expiry + refresh path that actually drives the existing `authError: "session_expired"` popup state.
 
-- [ ] **`/api/analytics` requires a session cookie the extension can never send — analytics pipeline is dead**
+- [x] **`/api/analytics` requires a session cookie the extension can never send — analytics pipeline is dead**
   - `apps/web/app/api/analytics/route.ts` requires `await auth()` to succeed (cookie-based session).
   - `services/extension/src/analytics-flush.ts` posts with a plain `fetch(...)`, no `credentials: "include"`, and even with it, a `chrome-extension://` service-worker fetch to `blocklock.app` is cross-site so the session cookie is never attached.
   - Every flush will 401. The README's "analytics pipeline streams browsing durations from the extension to the dashboard" does not currently function end-to-end.
   - Acceptance: use the same token scheme as `/api/sync` for `/api/analytics`; confirm with a real logged-in build that a flush round-trips and rows land in `UsageLog`.
 
-- [ ] **No server-side sign-out / credential revocation**
+- [x] **No server-side sign-out / credential revocation**
   - `BLOCK_LOCK_SIGNOUT` only clears local `chrome.storage.local` state; there's no server-side invalidation of whatever credential the extension is holding.
   - Acceptance: once P1's token scheme lands, signing out on the dashboard (or from the extension) should invalidate that specific token server-side, not just forget it locally.
 
@@ -45,7 +45,7 @@ submission, P3 is architecture/cost cleanup, P4 is smaller hardening.
 
 ## P1 — Security: no rate limiting on the only public-facing endpoints
 
-- [ ] **Add rate limiting to `/api/sync` and `/api/analytics`**
+- [x] **Add rate limiting to `/api/sync` and `/api/analytics`**
   - `apps/web/lib/rate-limit.ts` is already applied to `/api/ai/schedule`, `/api/classify`, `/api/usage` — but not to `/sync` or `/analytics`, which are exactly the two endpoints reachable without a valid session today.
   - A `/sync` cache miss does a Prisma read *and* an Upstash write keyed by attacker-controlled `userId` — cheap to abuse into real Postgres load and real Upstash bill (pay-per-request pricing).
   - Acceptance: both routes reject excessive requests per IP/token the same way the AI routes do.
