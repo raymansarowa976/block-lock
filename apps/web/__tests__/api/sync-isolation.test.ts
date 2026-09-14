@@ -15,10 +15,12 @@ vi.mock("@/lib/prisma", () => ({
   },
 }))
 vi.mock("@/lib/sync-token", () => ({ verifySyncToken: vi.fn() }))
+vi.mock("@/lib/rate-limit", () => ({ rateLimit: vi.fn() }))
 
 import { redis } from "@/lib/redis"
 import { prisma } from "@/lib/prisma"
 import { verifySyncToken } from "@/lib/sync-token"
+import { rateLimit } from "@/lib/rate-limit"
 import { GET } from "@/app/api/sync/route"
 
 const mockGet = redis.get as unknown as Mock
@@ -27,6 +29,7 @@ const mockFindMany = (
   prisma as unknown as { timeLimit: { findMany: Mock } }
 ).timeLimit.findMany
 const mockVerify = verifySyncToken as unknown as Mock
+const mockRateLimit = rateLimit as unknown as Mock
 
 const USER_ID = "clh3q5g0o0000qmij2z3m4n5k"
 const VALID_TOKEN = "valid.token"
@@ -71,6 +74,7 @@ beforeEach(() => {
   mockVerify.mockImplementation((token: string) =>
     token === VALID_TOKEN ? { userId: USER_ID } : null,
   )
+  mockRateLimit.mockResolvedValue({ allowed: true, remaining: 59, resetAt: Date.now() + 60_000 })
 })
 
 // ---------------------------------------------------------------------------

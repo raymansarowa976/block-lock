@@ -1,6 +1,7 @@
 import { describe, it, expect, vi, beforeEach, Mock } from "vitest"
 
 vi.mock("@/lib/sync-token", () => ({ verifySyncToken: vi.fn() }))
+vi.mock("@/lib/rate-limit", () => ({ rateLimit: vi.fn() }))
 vi.mock("@/lib/prisma", () => ({
   prisma: {
     usageLog: { createMany: vi.fn() },
@@ -8,16 +9,21 @@ vi.mock("@/lib/prisma", () => ({
 }))
 
 import { verifySyncToken } from "@/lib/sync-token"
+import { rateLimit } from "@/lib/rate-limit"
 import { prisma } from "@/lib/prisma"
 import { POST, OPTIONS } from "@/app/api/analytics/route"
 
 const mockVerify = verifySyncToken as unknown as Mock
+const mockRateLimit = rateLimit as unknown as Mock
 const mockCreateMany = (
   prisma as unknown as { usageLog: { createMany: Mock } }
 ).usageLog.createMany
 
 const USER_ID = "clh3q5g0o0000qmij2z3m4n5k"
 const VALID_TOKEN = "valid.token"
+
+const RATE_ALLOWED = { allowed: true, remaining: 59, resetAt: Date.now() + 60_000 }
+const RATE_BLOCKED = { allowed: false, remaining: 0, resetAt: Date.now() + 60_000 }
 
 const EXTENSION_ID = "ldlmnamnojhcjjnfoodglmcnaedagljl"
 const EXTENSION_ORIGIN = `chrome-extension://${EXTENSION_ID}`
@@ -48,6 +54,7 @@ beforeEach(() => {
   mockVerify.mockImplementation((token: string) =>
     token === VALID_TOKEN ? { userId: USER_ID } : null,
   )
+  mockRateLimit.mockResolvedValue(RATE_ALLOWED)
 })
 
 // ---------------------------------------------------------------------------
@@ -67,6 +74,11 @@ describe("POST /api/analytics – authentication", () => {
     expect(mockCreateMany).not.toHaveBeenCalled()
   })
 
+  it("does not invoke the rate limiter when the token is missing", async () => {
+    await POST(jsonRequest({ entries: VALID_ENTRIES }))
+    expect(mockRateLimit).not.toHaveBeenCalled()
+  })
+
   it("returns 401 when the token fails verification", async () => {
     const res = await POST(jsonRequest({ entries: VALID_ENTRIES }, { token: "garbage" }))
     expect(res.status).toBe(401)
@@ -77,9 +89,62 @@ describe("POST /api/analytics – authentication", () => {
     expect(mockCreateMany).not.toHaveBeenCalled()
   })
 
+  it("does not invoke the rate limiter when the token is invalid", async () => {
+    await POST(jsonRequest({ entries: VALID_ENTRIES }, { token: "garbage" }))
+    expect(mockRateLimit).not.toHaveBeenCalled()
+  })
+
   it("never trusts a raw userId passed instead of a token", async () => {
     const res = await POST(jsonRequest({ entries: VALID_ENTRIES }, { token: USER_ID }))
     expect(res.status).toBe(401)
+  })
+})
+
+// ---------------------------------------------------------------------------
+// POST /api/analytics – rate limiting (a valid token proves identity but not
+// good intent — a leaked or replayed token can still be used to hammer this
+// route into repeated createMany writes, so the limiter runs right after
+// verification, same as the session-authed routes)
+// ---------------------------------------------------------------------------
+
+describe("POST /api/analytics – rate limiting", () => {
+  it("returns 429 when the rate limit is exceeded", async () => {
+    mockRateLimit.mockResolvedValue(RATE_BLOCKED)
+    const res = await POST(jsonRequest({ entries: VALID_ENTRIES }, { token: VALID_TOKEN }))
+    expect(res.status).toBe(429)
+  })
+
+  it("does not touch the database when the rate limit is exceeded", async () => {
+    mockRateLimit.mockResolvedValue(RATE_BLOCKED)
+    await POST(jsonRequest({ entries: VALID_ENTRIES }, { token: VALID_TOKEN }))
+    expect(mockCreateMany).not.toHaveBeenCalled()
+  })
+
+  it("includes X-RateLimit-Remaining: 0 in the 429 response", async () => {
+    mockRateLimit.mockResolvedValue(RATE_BLOCKED)
+    const res = await POST(jsonRequest({ entries: VALID_ENTRIES }, { token: VALID_TOKEN }))
+    expect(res.headers.get("X-RateLimit-Remaining")).toBe("0")
+  })
+
+  it("includes a positive Retry-After header in the 429 response", async () => {
+    mockRateLimit.mockResolvedValue(RATE_BLOCKED)
+    const res = await POST(jsonRequest({ entries: VALID_ENTRIES }, { token: VALID_TOKEN }))
+    const retryAfter = Number(res.headers.get("Retry-After"))
+    expect(retryAfter).toBeGreaterThan(0)
+  })
+
+  it("scopes rate limiting to the token-verified userId", async () => {
+    await POST(jsonRequest({ entries: VALID_ENTRIES }, { token: VALID_TOKEN }))
+    expect(mockRateLimit).toHaveBeenCalledWith(USER_ID)
+  })
+
+  it("sets CORS headers on a 429 response too, so the extension can read the rejection", async () => {
+    mockRateLimit.mockResolvedValue(RATE_BLOCKED)
+    const res = await POST(
+      jsonRequest({ entries: VALID_ENTRIES }, { token: VALID_TOKEN, origin: EXTENSION_ORIGIN }),
+    )
+    expect(res.status).toBe(429)
+    expect(res.headers.get("Access-Control-Allow-Origin")).toBe(EXTENSION_ORIGIN)
   })
 })
 
