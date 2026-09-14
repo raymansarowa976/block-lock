@@ -1,6 +1,7 @@
 import { prisma } from "@/lib/prisma"
 import { corsHeaders, handleCorsPreflight } from "@/lib/cors"
 import { verifySyncToken } from "@/lib/sync-token"
+import { rateLimit } from "@/lib/rate-limit"
 import { AnalyticsBatchSchema } from "@block-lock/shared-types"
 import { NextResponse } from "next/server"
 
@@ -26,6 +27,24 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401, headers })
   }
   const userId = verified.userId
+
+  // A valid token proves identity, not good intent — a leaked or replayed
+  // token can still be used to hammer this route into repeated createMany
+  // writes, so the limiter runs before the body is even parsed.
+  const rate = await rateLimit(userId)
+  if (!rate.allowed) {
+    return NextResponse.json(
+      { error: "Too Many Requests" },
+      {
+        status: 429,
+        headers: {
+          ...headers,
+          "X-RateLimit-Remaining": String(rate.remaining),
+          "Retry-After": String(Math.max(1, Math.ceil((rate.resetAt - Date.now()) / 1000))),
+        },
+      },
+    )
+  }
 
   let body: unknown
   try {
