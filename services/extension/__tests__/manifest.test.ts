@@ -1,6 +1,12 @@
 // @vitest-environment node
 import { describe, it, expect } from "vitest"
+import fs from "node:fs"
+import path from "node:path"
+import { fileURLToPath } from "node:url"
 import manifest from "../manifest.json"
+
+const __dirname = fileURLToPath(new URL(".", import.meta.url))
+const EXTENSION_ROOT = path.join(__dirname, "..")
 
 type Action = {
   default_popup?: string
@@ -17,6 +23,7 @@ type ManifestV3 = {
   externally_connectable?: { matches: string[] }
   background: { service_worker: string; type: string }
   action: Action
+  icons?: Record<string, string>
 }
 
 const m = manifest as ManifestV3
@@ -94,5 +101,39 @@ describe("Manifest V3 – action popup configuration", () => {
     expect(m.action).toHaveProperty("default_title")
     expect(typeof m.action.default_title).toBe("string")
     expect((m.action.default_title as string).length).toBeGreaterThan(0)
+  })
+})
+
+const REQUIRED_ICON_SIZES = ["16", "32", "48", "128"]
+
+describe("Manifest V3 – icons required for store submission", () => {
+  it("declares a top-level icons map covering 16/32/48/128px", () => {
+    expect(m.icons).toBeDefined()
+    for (const size of REQUIRED_ICON_SIZES) {
+      expect(m.icons?.[size]).toBeTruthy()
+    }
+  })
+
+  it("points each top-level icon entry at a file that exists on disk", () => {
+    for (const size of REQUIRED_ICON_SIZES) {
+      const iconPath = m.icons?.[size]
+      expect(iconPath).toBeTruthy()
+      expect(fs.existsSync(path.join(EXTENSION_ROOT, iconPath as string))).toBe(true)
+    }
+  })
+
+  it("registers a default_icon map on the toolbar action covering 16/32/48/128px", () => {
+    expect(m.action.default_icon).toBeDefined()
+    for (const size of REQUIRED_ICON_SIZES) {
+      expect(m.action.default_icon?.[size]).toBeTruthy()
+    }
+  })
+
+  it("points each action default_icon entry at a file that exists on disk", () => {
+    for (const size of REQUIRED_ICON_SIZES) {
+      const iconPath = m.action.default_icon?.[size]
+      expect(iconPath).toBeTruthy()
+      expect(fs.existsSync(path.join(EXTENSION_ROOT, iconPath as string))).toBe(true)
+    }
   })
 })
