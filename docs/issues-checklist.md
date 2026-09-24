@@ -54,7 +54,7 @@ submission, P3 is architecture/cost cleanup, P4 is smaller hardening.
 
 ## P2 — Not submittable to the Chrome Web Store
 
-- [ ] **Add extension icons**
+- [x] **Add extension icons**
   - `manifest.json` has no `icons` key; no icon assets exist under `services/extension/`. Submission is not possible without them.
 
 - [ ] **Write and publish a privacy policy**
