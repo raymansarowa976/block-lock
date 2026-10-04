@@ -39,7 +39,7 @@ describe("PrivacyPage", () => {
   it("names every third party that receives user data", () => {
     render(<PrivacyPage />)
     const sharing = section(/how we share/i)
-    for (const vendor of [/openai/i, /vercel/i, /upstash/i, /google/i]) {
+    for (const vendor of [/openai/i, /vercel/i, /upstash/i, /neon/i, /google/i]) {
       expect(within(sharing).getAllByText(vendor).length).toBeGreaterThan(0)
     }
     expect(within(sharing).getByText(/do not sell/i)).toBeInTheDocument()
