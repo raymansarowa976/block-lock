@@ -5,4 +5,4 @@ export const DEFAULT_DAILY_LIMIT_MINUTES = 30
 
 // Public contact address shown on /privacy (and referenced by the Chrome Web
 // Store listing) for privacy questions and data requests.
-export const PRIVACY_CONTACT_EMAIL = "privacy@blocklock.app"
+export const PRIVACY_CONTACT_EMAIL = "raymansarowa1@gmail.com"

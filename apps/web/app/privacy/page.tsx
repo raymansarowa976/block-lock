@@ -119,7 +119,8 @@ export default function PrivacyPage() {
               <strong>Vercel</strong>: hosts the web dashboard and API, and runs our scheduled jobs.
             </li>
             <li>
-              <strong>Our database provider</strong>: stores your account, rules and usage records.
+              <strong>Neon</strong>: hosts our Postgres database, which stores your account, rules and
+              usage records.
             </li>
             <li>
               <strong>Upstash</strong>: caches your blocking rules and sign-out records for a few minutes
