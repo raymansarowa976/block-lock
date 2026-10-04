@@ -1,3 +1,4 @@
+import Link from "next/link"
 import { Shield } from "lucide-react"
 import { signIn } from "@/auth"
 
@@ -34,6 +35,14 @@ export default function LoginPage() {
             Continue with Google
           </button>
         </form>
+
+        <p className="mt-6 text-center text-sm text-slate-500">
+          Learn what we collect in our{" "}
+          <Link href="/privacy" className="underline hover:text-slate-900">
+            Privacy Policy
+          </Link>
+          .
+        </p>
       </div>
     </div>
   )
