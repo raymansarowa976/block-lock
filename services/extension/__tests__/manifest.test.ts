@@ -53,9 +53,8 @@ describe("Manifest V3 – specification compliance", () => {
     expect(m.background.type).toBe("module")
   })
 
-  it("declares declarativeNetRequest and declarativeNetRequestFeedback permissions", () => {
+  it("declares declarativeNetRequest permission", () => {
     expect(m.permissions).toContain("declarativeNetRequest")
-    expect(m.permissions).toContain("declarativeNetRequestFeedback")
   })
 
   it("declares storage permission", () => {
@@ -66,8 +65,25 @@ describe("Manifest V3 – specification compliance", () => {
     expect(m.permissions).toContain("alarms")
   })
 
-  it("declares tabs permission for reading tab URLs in navigation events", () => {
-    expect(m.permissions).toContain("tabs")
+})
+
+// Store review scrutiny scales with the permissions requested, so the list is
+// pinned exactly — adding one should be a deliberate, justified change.
+describe("Manifest V3 – minimal permission set", () => {
+  it("requests only the permissions the extension uses", () => {
+    expect([...m.permissions].sort()).toEqual(["alarms", "declarativeNetRequest", "storage"])
+  })
+
+  // tab.url / changeInfo.url (usage-monitor.ts, analytics-buffer.ts) are
+  // already exposed for every page matched by host_permissions' <all_urls>.
+  it("does not request tabs, which <all_urls> host access makes redundant", () => {
+    expect(m.permissions).not.toContain("tabs")
+  })
+
+  // Feedback only unlocks getMatchedRules / onRuleMatchedDebug, neither of
+  // which the rule engine calls.
+  it("does not request declarativeNetRequestFeedback", () => {
+    expect(m.permissions).not.toContain("declarativeNetRequestFeedback")
   })
 })
 

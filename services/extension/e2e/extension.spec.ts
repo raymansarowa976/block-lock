@@ -130,3 +130,37 @@ test("failed navigation context url matches the rule-configured domain", async (
 
   await page.close()
 })
+// ---------------------------------------------------------------------------
+// Acceptance criterion 3 — Tab URLs stay readable without the "tabs" permission
+// ---------------------------------------------------------------------------
+
+// usage-monitor.ts (tabs.query) and analytics-buffer.ts (tabs.onUpdated) need
+// tab.url, which Chrome only exposes with "tabs" or matching host access. The
+// manifest relies on <all_urls> alone, so prove the real browser honours it.
+test("service worker can read the active tab url via host permissions alone", async () => {
+  const http = await import("node:http")
+  const server = http.createServer((_req, res) => {
+    res.writeHead(200, { "Content-Type": "text/html" })
+    res.end("<title>tab-url-probe</title>")
+  })
+  await new Promise<void>((resolve) => server.listen(0, "127.0.0.1", resolve))
+  const { port } = server.address() as { port: number }
+  const url = `http://127.0.0.1:${port}/`
+
+  let [sw] = ctx.serviceWorkers()
+  if (!sw) sw = await ctx.waitForEvent("serviceworker")
+
+  const page = await ctx.newPage()
+  try {
+    await page.goto(url)
+    const tabUrls = (await sw.evaluate(async () => {
+      const tabs = await chrome.tabs.query({})
+      return tabs.map((t) => t.url)
+    })) as Array<string | undefined>
+
+    expect(tabUrls).toContain(url)
+  } finally {
+    await page.close()
+    server.close()
+  }
+})
