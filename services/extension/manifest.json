@@ -5,10 +5,8 @@
   "description": "Enforce focus by blocking distracting sites via declarativeNetRequest.",
   "permissions": [
     "declarativeNetRequest",
-    "declarativeNetRequestFeedback",
     "storage",
-    "alarms",
-    "tabs"
+    "alarms"
   ],
   "host_permissions": ["<all_urls>"],
   "externally_connectable": {
