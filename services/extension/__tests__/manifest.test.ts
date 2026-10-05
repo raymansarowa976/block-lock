@@ -18,6 +18,7 @@ type ManifestV3 = {
   manifest_version: number
   name: string
   version: string
+  description: string
   permissions: string[]
   host_permissions: string[]
   externally_connectable?: { matches: string[] }
@@ -84,6 +85,31 @@ describe("Manifest V3 – minimal permission set", () => {
   // which the rule engine calls.
   it("does not request declarativeNetRequestFeedback", () => {
     expect(m.permissions).not.toContain("declarativeNetRequestFeedback")
+  })
+})
+
+// The description is the store's one-line summary and is checked against the
+// single-purpose policy. AI scheduling, domain classification and insights run
+// entirely server-side, so the extension must not claim them.
+describe("Manifest V3 – store description", () => {
+  it("fits the Chrome Web Store 132-character limit", () => {
+    expect(m.description.length).toBeGreaterThan(0)
+    expect(m.description.length).toBeLessThanOrEqual(132)
+  })
+
+  it("states the single purpose: blocking distracting sites", () => {
+    expect(m.description).toMatch(/\bblocks?\b/i)
+    expect(m.description).toMatch(/\bsites?\b/i)
+  })
+
+  it("does not claim server-side AI features", () => {
+    expect(m.description).not.toMatch(
+      /\bAI\b|artificial intelligence|machine learning|\bsmart\b|intelligen|coach|insight|natural[- ]language|classif|\bGPT\b|\bLLM\b/i,
+    )
+  })
+
+  it("does not lean on Chrome API jargon users won't recognise", () => {
+    expect(m.description).not.toMatch(/declarativeNetRequest/i)
   })
 })
 
