@@ -2,7 +2,7 @@
   "manifest_version": 3,
   "name": "Block Lock",
   "version": "0.1.0",
-  "description": "Enforce focus by blocking distracting sites via declarativeNetRequest.",
+  "description": "Blocks distracting sites on the schedules and daily time limits you set in your Block Lock dashboard.",
   "permissions": [
     "declarativeNetRequest",
     "storage",
