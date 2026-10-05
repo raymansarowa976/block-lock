@@ -57,20 +57,20 @@ submission, P3 is architecture/cost cleanup, P4 is smaller hardening.
 - [x] **Add extension icons**
   - `manifest.json` has no `icons` key; no icon assets exist under `services/extension/`. Submission is not possible without them.
 
-- [ ] **Write and publish a privacy policy**
+- [x] **Write and publish a privacy policy**
   - The extension collects browsing domains + time-on-site and ships them server-side (`UsageLog`). This is Chrome Web Store "User Data" policy territory — a privacy policy URL is mandatory in the listing, and there's currently no privacy policy page anywhere in `apps/web/app`.
 
-- [ ] **Re-justify or narrow `host_permissions: ["<all_urls>"]` + `"tabs"`**
+- [x] **Re-justify or narrow `host_permissions: ["<all_urls>"]` + `"tabs"`**
   - This combination puts the listing in the highest review-scrutiny bucket (typically requires a written justification + demo video).
   - Check whether `"tabs"` is even needed: `analytics-buffer.ts` only reads `changeInfo.url` off `chrome.tabs.onUpdated`, which matched hosts can already provide under `host_permissions` alone in MV3. Dropping `"tabs"` narrows the ask.
 
-- [ ] **Get a real deployment live before submitting**
+- [x] **Get a real deployment live before submitting**
   - `externally_connectable` points at `https://blocklock.app`, but the README says the project "is not yet live." Reviewers will exercise "Connect your account" in the popup and need a working backend.
 
-- [ ] **Tighten single-purpose listing copy**
+- [x] **Tighten single-purpose listing copy**
   - Manifest description says "Enforce focus by blocking distracting sites," but the backend also does AI natural-language scheduling (`/api/ai/schedule`), embedding-based domain classification (`/api/classify`), and an AI "productivity coach" (`/api/cron/insights`). None of it runs client-side (good) — just make sure store copy doesn't overclaim AI features that live entirely server-side, and that the extension reads as doing one clear thing.
 
-- [ ] **Establish a real release/versioning process before shipping updates**
+- [x] **Establish a real release/versioning process before shipping updates**
   - Currently `0.1.0`, no changelog discipline. `scripts/zip-dist.mjs` is a fine build step to build on. Every store update needs a version bump and gets re-reviewed — worth a documented process before the first submission.
 
 ---
