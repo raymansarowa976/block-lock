@@ -18,6 +18,7 @@ type ManifestV3 = {
   manifest_version: number
   name: string
   version: string
+  description: string
   permissions: string[]
   host_permissions: string[]
   externally_connectable?: { matches: string[] }
@@ -53,9 +54,8 @@ describe("Manifest V3 – specification compliance", () => {
     expect(m.background.type).toBe("module")
   })
 
-  it("declares declarativeNetRequest and declarativeNetRequestFeedback permissions", () => {
+  it("declares declarativeNetRequest permission", () => {
     expect(m.permissions).toContain("declarativeNetRequest")
-    expect(m.permissions).toContain("declarativeNetRequestFeedback")
   })
 
   it("declares storage permission", () => {
@@ -66,8 +66,50 @@ describe("Manifest V3 – specification compliance", () => {
     expect(m.permissions).toContain("alarms")
   })
 
-  it("declares tabs permission for reading tab URLs in navigation events", () => {
-    expect(m.permissions).toContain("tabs")
+})
+
+// Store review scrutiny scales with the permissions requested, so the list is
+// pinned exactly — adding one should be a deliberate, justified change.
+describe("Manifest V3 – minimal permission set", () => {
+  it("requests only the permissions the extension uses", () => {
+    expect([...m.permissions].sort()).toEqual(["alarms", "declarativeNetRequest", "storage"])
+  })
+
+  // tab.url / changeInfo.url (usage-monitor.ts, analytics-buffer.ts) are
+  // already exposed for every page matched by host_permissions' <all_urls>.
+  it("does not request tabs, which <all_urls> host access makes redundant", () => {
+    expect(m.permissions).not.toContain("tabs")
+  })
+
+  // Feedback only unlocks getMatchedRules / onRuleMatchedDebug, neither of
+  // which the rule engine calls.
+  it("does not request declarativeNetRequestFeedback", () => {
+    expect(m.permissions).not.toContain("declarativeNetRequestFeedback")
+  })
+})
+
+// The description is the store's one-line summary and is checked against the
+// single-purpose policy. AI scheduling, domain classification and insights run
+// entirely server-side, so the extension must not claim them.
+describe("Manifest V3 – store description", () => {
+  it("fits the Chrome Web Store 132-character limit", () => {
+    expect(m.description.length).toBeGreaterThan(0)
+    expect(m.description.length).toBeLessThanOrEqual(132)
+  })
+
+  it("states the single purpose: blocking distracting sites", () => {
+    expect(m.description).toMatch(/\bblocks?\b/i)
+    expect(m.description).toMatch(/\bsites?\b/i)
+  })
+
+  it("does not claim server-side AI features", () => {
+    expect(m.description).not.toMatch(
+      /\bAI\b|artificial intelligence|machine learning|\bsmart\b|intelligen|coach|insight|natural[- ]language|classif|\bGPT\b|\bLLM\b/i,
+    )
+  })
+
+  it("does not lean on Chrome API jargon users won't recognise", () => {
+    expect(m.description).not.toMatch(/declarativeNetRequest/i)
   })
 })
 
