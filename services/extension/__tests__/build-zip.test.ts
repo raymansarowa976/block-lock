@@ -12,7 +12,15 @@ const manifest = JSON.parse(
 )
 const EXPECTED_ZIP = path.join(DIST, `block-lock-extension-${manifest.version}.zip`)
 
-const REQUIRED_ENTRIES = ["manifest.json", "popup.html", "src/background.js"]
+const REQUIRED_ENTRIES = [
+  "manifest.json",
+  "popup.html",
+  "src/background.js",
+  "icons/icon16.png",
+  "icons/icon32.png",
+  "icons/icon48.png",
+  "icons/icon128.png",
+]
 
 describe("extension production zip archive", () => {
   it("dist/ contains a versioned zip matching the manifest version", () => {

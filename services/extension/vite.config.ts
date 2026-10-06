@@ -2,9 +2,10 @@ import { defineConfig } from "vite"
 import react from "@vitejs/plugin-react"
 import tailwindcss from "@tailwindcss/vite"
 import { resolve } from "path"
-import { copyFileSync } from "fs"
+import { copyFileSync, cpSync } from "fs"
 
 export default defineConfig({
+  envPrefix: ["VITE_", "NEXT_PUBLIC_"],
   plugins: [
     react(),
     tailwindcss(),
@@ -15,6 +16,9 @@ export default defineConfig({
           resolve(__dirname, "manifest.json"),
           resolve(__dirname, "dist/manifest.json"),
         )
+        cpSync(resolve(__dirname, "icons"), resolve(__dirname, "dist/icons"), {
+          recursive: true,
+        })
       },
     },
   ],

@@ -1,6 +1,7 @@
 "use client"
 
 import { useState } from "react"
+import { useRouter } from "next/navigation"
 import { useForm, type Resolver } from "react-hook-form"
 import { zodResolver } from "@hookform/resolvers/zod"
 import { z } from "zod"
@@ -9,6 +10,7 @@ import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { createTimeLimit } from "@/lib/actions/time-limits"
+import { notifyExtensionRulesUpdated } from "@/components/extension-bridge"
 
 const FormSchema = z.object({
   domain: z
@@ -27,8 +29,21 @@ const FormSchema = z.object({
 
 type FormValues = z.output<typeof FormSchema>
 
-export function TimeLimitForm() {
+type OptimisticTimeLimit = {
+  domain: string
+  dailyLimit: number | null
+  isActive: boolean
+  schedules: []
+}
+
+interface TimeLimitFormProps {
+  onOptimisticAdd?: (rule: OptimisticTimeLimit) => string
+  onOptimisticAddFailed?: (id: string) => void
+}
+
+export function TimeLimitForm({ onOptimisticAdd, onOptimisticAddFailed }: TimeLimitFormProps = {}) {
   const [isPending, setIsPending] = useState(false)
+  const router = useRouter()
 
   const {
     register,
@@ -42,7 +57,21 @@ export function TimeLimitForm() {
 
   async function onSubmit(data: FormValues) {
     setIsPending(true)
-    await createTimeLimit(data)
+
+    const tempId = onOptimisticAdd?.({
+      domain: data.domain,
+      dailyLimit: data.dailyLimit,
+      isActive: data.isActive,
+      schedules: [],
+    })
+
+    const result = await createTimeLimit(data)
+    if (result.success) {
+      notifyExtensionRulesUpdated()
+      router.refresh()
+    } else if (tempId) {
+      onOptimisticAddFailed?.(tempId)
+    }
     setIsPending(false)
     reset()
   }

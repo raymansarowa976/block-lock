@@ -1,6 +1,12 @@
 // @vitest-environment node
 import { describe, it, expect } from "vitest"
+import fs from "node:fs"
+import path from "node:path"
+import { fileURLToPath } from "node:url"
 import manifest from "../manifest.json"
+
+const __dirname = fileURLToPath(new URL(".", import.meta.url))
+const EXTENSION_ROOT = path.join(__dirname, "..")
 
 type Action = {
   default_popup?: string
@@ -12,10 +18,13 @@ type ManifestV3 = {
   manifest_version: number
   name: string
   version: string
+  description: string
   permissions: string[]
   host_permissions: string[]
+  externally_connectable?: { matches: string[] }
   background: { service_worker: string; type: string }
   action: Action
+  icons?: Record<string, string>
 }
 
 const m = manifest as ManifestV3
@@ -45,9 +54,8 @@ describe("Manifest V3 – specification compliance", () => {
     expect(m.background.type).toBe("module")
   })
 
-  it("declares declarativeNetRequest and declarativeNetRequestFeedback permissions", () => {
+  it("declares declarativeNetRequest permission", () => {
     expect(m.permissions).toContain("declarativeNetRequest")
-    expect(m.permissions).toContain("declarativeNetRequestFeedback")
   })
 
   it("declares storage permission", () => {
@@ -58,8 +66,69 @@ describe("Manifest V3 – specification compliance", () => {
     expect(m.permissions).toContain("alarms")
   })
 
-  it("declares tabs permission for reading tab URLs in navigation events", () => {
-    expect(m.permissions).toContain("tabs")
+})
+
+// Store review scrutiny scales with the permissions requested, so the list is
+// pinned exactly — adding one should be a deliberate, justified change.
+describe("Manifest V3 – minimal permission set", () => {
+  it("requests only the permissions the extension uses", () => {
+    expect([...m.permissions].sort()).toEqual(["alarms", "declarativeNetRequest", "storage"])
+  })
+
+  // tab.url / changeInfo.url (usage-monitor.ts, analytics-buffer.ts) are
+  // already exposed for every page matched by host_permissions' <all_urls>.
+  it("does not request tabs, which <all_urls> host access makes redundant", () => {
+    expect(m.permissions).not.toContain("tabs")
+  })
+
+  // Feedback only unlocks getMatchedRules / onRuleMatchedDebug, neither of
+  // which the rule engine calls.
+  it("does not request declarativeNetRequestFeedback", () => {
+    expect(m.permissions).not.toContain("declarativeNetRequestFeedback")
+  })
+})
+
+// The description is the store's one-line summary and is checked against the
+// single-purpose policy. AI scheduling, domain classification and insights run
+// entirely server-side, so the extension must not claim them.
+describe("Manifest V3 – store description", () => {
+  it("fits the Chrome Web Store 132-character limit", () => {
+    expect(m.description.length).toBeGreaterThan(0)
+    expect(m.description.length).toBeLessThanOrEqual(132)
+  })
+
+  it("states the single purpose: blocking distracting sites", () => {
+    expect(m.description).toMatch(/\bblocks?\b/i)
+    expect(m.description).toMatch(/\bsites?\b/i)
+  })
+
+  it("does not claim server-side AI features", () => {
+    expect(m.description).not.toMatch(
+      /\bAI\b|artificial intelligence|machine learning|\bsmart\b|intelligen|coach|insight|natural[- ]language|classif|\bGPT\b|\bLLM\b/i,
+    )
+  })
+
+  it("does not lean on Chrome API jargon users won't recognise", () => {
+    expect(m.description).not.toMatch(/declarativeNetRequest/i)
+  })
+})
+
+describe("Manifest V3 – externally_connectable production origin", () => {
+  it("declares an externally_connectable block", () => {
+    expect(m.externally_connectable).toBeDefined()
+    expect(Array.isArray(m.externally_connectable?.matches)).toBe(true)
+  })
+
+  it("allows messages from the blocklock.app production domain", () => {
+    expect(m.externally_connectable?.matches).toContain("https://blocklock.app/*")
+  })
+
+  it("allows messages from localhost during development", () => {
+    expect(m.externally_connectable?.matches).toContain("http://localhost:3000/*")
+  })
+
+  it("does not allow messages from the retired block-lock.vercel.app domain", () => {
+    expect(m.externally_connectable?.matches).not.toContain("https://block-lock.vercel.app/*")
   })
 })
 
@@ -74,5 +143,39 @@ describe("Manifest V3 – action popup configuration", () => {
     expect(m.action).toHaveProperty("default_title")
     expect(typeof m.action.default_title).toBe("string")
     expect((m.action.default_title as string).length).toBeGreaterThan(0)
+  })
+})
+
+const REQUIRED_ICON_SIZES = ["16", "32", "48", "128"]
+
+describe("Manifest V3 – icons required for store submission", () => {
+  it("declares a top-level icons map covering 16/32/48/128px", () => {
+    expect(m.icons).toBeDefined()
+    for (const size of REQUIRED_ICON_SIZES) {
+      expect(m.icons?.[size]).toBeTruthy()
+    }
+  })
+
+  it("points each top-level icon entry at a file that exists on disk", () => {
+    for (const size of REQUIRED_ICON_SIZES) {
+      const iconPath = m.icons?.[size]
+      expect(iconPath).toBeTruthy()
+      expect(fs.existsSync(path.join(EXTENSION_ROOT, iconPath as string))).toBe(true)
+    }
+  })
+
+  it("registers a default_icon map on the toolbar action covering 16/32/48/128px", () => {
+    expect(m.action.default_icon).toBeDefined()
+    for (const size of REQUIRED_ICON_SIZES) {
+      expect(m.action.default_icon?.[size]).toBeTruthy()
+    }
+  })
+
+  it("points each action default_icon entry at a file that exists on disk", () => {
+    for (const size of REQUIRED_ICON_SIZES) {
+      const iconPath = m.action.default_icon?.[size]
+      expect(iconPath).toBeTruthy()
+      expect(fs.existsSync(path.join(EXTENSION_ROOT, iconPath as string))).toBe(true)
+    }
   })
 })

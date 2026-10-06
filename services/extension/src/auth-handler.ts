@@ -1,16 +1,30 @@
 import type { SyncPayload } from "@block-lock/shared-types"
 import { applyBlockRules } from "./rule-engine"
-
-const API_BASE = import.meta.env.VITE_API_BASE ?? "https://block-lock.vercel.app/api"
+import { API_BASE } from "./config"
 
 export const ALLOWED_ORIGINS = [
-  "https://block-lock.vercel.app",
+  "https://blocklock.app",
   "http://localhost:3000",
 ]
 
-export type AuthMessage = { type: "BLOCK_LOCK_AUTH"; userId: string }
+// The credential is a short-lived signed token minted from an authenticated
+// dashboard session (apps/web/app/api/sync/token/route.ts), not a bare
+// userId — a bare cuid never expires and can't be revoked short of deleting
+// the account. userId still rides along purely for the popup's "Connected"
+// display; /api/sync itself only trusts the token.
+export type AuthMessage = {
+  type: "BLOCK_LOCK_AUTH"
+  userId: string
+  token: string
+  expiresAt: number
+}
 export type SignoutMessage = { type: "BLOCK_LOCK_SIGNOUT" }
-export type ExtMessage = AuthMessage | SignoutMessage
+export type RulesUpdatedMessage = { type: "BLOCK_LOCK_RULES_UPDATED" }
+export type ExtMessage = AuthMessage | SignoutMessage | RulesUpdatedMessage
+
+function clearCredential() {
+  return { userId: null, token: null, tokenExpiresAt: null }
+}
 
 export async function handleExternalMessage(
   message: ExtMessage,
@@ -26,31 +40,64 @@ export async function handleExternalMessage(
   }
 
   if (message.type === "BLOCK_LOCK_AUTH") {
-    await chrome.storage.local.set({ userId: message.userId, authError: null })
+    await chrome.storage.local.set({
+      userId: message.userId,
+      token: message.token,
+      tokenExpiresAt: message.expiresAt,
+      authError: null,
+    })
     syncRules().catch(() => {})
     sendResponse({ ok: true })
     return
   }
 
   if (message.type === "BLOCK_LOCK_SIGNOUT") {
-    await chrome.storage.local.set({ userId: null, authError: null, lastSync: null })
+    // Best-effort server-side revocation — the extension has no dashboard
+    // session, only the token itself, so it authenticates the revoke call
+    // with that. Local state is cleared either way; a failed revoke just
+    // means the token rides out its own 15-minute TTL instead of dying
+    // immediately.
+    const { token } = await chrome.storage.local.get(["token"])
+    if (token) {
+      try {
+        await fetch(`${API_BASE}/sync/revoke?token=${token}`, { method: "POST" })
+      } catch {
+        // Network failure — proceed to clear local state regardless.
+      }
+    }
+
+    await chrome.storage.local.set({ ...clearCredential(), authError: null, lastSync: null })
+    sendResponse({ ok: true })
+    return
+  }
+
+  if (message.type === "BLOCK_LOCK_RULES_UPDATED") {
+    await syncRules()
     sendResponse({ ok: true })
   }
 }
 
 export async function syncRules(): Promise<void> {
-  const { userId } = await chrome.storage.local.get("userId")
-  if (!userId) return
+  const { token, tokenExpiresAt } = await chrome.storage.local.get(["token", "tokenExpiresAt"])
+  if (!token) return
 
-  const res = await fetch(`${API_BASE}/sync?userId=${userId}`)
+  // Catch an expired token locally before spending a round-trip on a 401 —
+  // this is the expiry path that actually drives the popup's session_expired
+  // state once a dashboard tab has been closed long enough for the token to lapse.
+  if (typeof tokenExpiresAt === "number" && Date.now() >= tokenExpiresAt) {
+    await chrome.storage.local.set({ ...clearCredential(), authError: "session_expired" })
+    return
+  }
+
+  const res = await fetch(`${API_BASE}/sync?token=${token}`)
 
   if (res.status === 401 || res.status === 403) {
-    await chrome.storage.local.set({ authError: "session_expired", userId: null })
+    await chrome.storage.local.set({ ...clearCredential(), authError: "session_expired" })
     return
   }
 
   if (!res.ok) return
 
   const payload: SyncPayload = await res.json()
-  await applyBlockRules(payload)
+  await applyBlockRules(payload.rules, payload.schedules)
 }

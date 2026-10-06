@@ -106,6 +106,8 @@ This produces a `services/extension/dist/` folder. Load it into Chrome:
 
 Sign in to the dashboard and the extension will automatically sync your blocking rules.
 
+To ship an extension update to the Chrome Web Store, follow [services/extension/RELEASING.md](services/extension/RELEASING.md).
+
 ### 6. Run the tests
 
 ```bash

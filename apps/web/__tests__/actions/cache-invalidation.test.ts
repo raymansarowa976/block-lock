@@ -16,6 +16,9 @@ vi.mock("@/lib/prisma", () => ({
       update: vi.fn(),
       delete: vi.fn(),
     },
+    user: {
+      findUnique: vi.fn(),
+    },
   },
 }))
 vi.mock("next/cache", () => ({ revalidatePath: vi.fn() }))
@@ -29,9 +32,11 @@ vi.mock("@prisma/client", () => ({
 import { auth } from "@/auth"
 import { prisma } from "@/lib/prisma"
 import { redis } from "@/lib/redis"
+import { revalidatePath } from "next/cache"
 import { createTimeLimit, updateTimeLimit, deleteTimeLimit } from "@/lib/actions/time-limits"
 import { createSchedule, updateSchedule, deleteSchedule } from "@/lib/actions/schedules"
 
+const mockRevalidatePath = revalidatePath as unknown as Mock
 const mockAuth = auth as unknown as Mock
 const mockPrisma = prisma as unknown as {
   $transaction: ReturnType<typeof vi.fn>
@@ -291,5 +296,174 @@ describe("deleteSchedule — cache invalidation", () => {
     await expect(deleteSchedule(SCHEDULE_ID)).rejects.toThrow()
 
     expect(mockDel).not.toHaveBeenCalled()
+  })
+})
+
+// ---------------------------------------------------------------------------
+// Redis outage resilience — regression coverage for the bug where an
+// unreachable Upstash host (getaddrinfo ENOTFOUND ...) made redis.del()
+// reject, which crashed the whole server action even though the underlying
+// Prisma write had already succeeded. Cache invalidation is best-effort and
+// must never fail a mutation that already committed.
+// ---------------------------------------------------------------------------
+
+const REDIS_UNREACHABLE = new Error(
+  "getaddrinfo ENOTFOUND light-aardvark-72428.upstash.io",
+)
+
+describe("createTimeLimit — resilience to a Redis outage", () => {
+  it("still returns success when redis.del rejects", async () => {
+    mockAuth.mockResolvedValue(AUTHED_SESSION)
+    mockPrisma.timeLimit.create.mockResolvedValue(makeTimeLimit())
+    mockDel.mockRejectedValueOnce(REDIS_UNREACHABLE)
+
+    await expect(
+      createTimeLimit({ domain: "example.com", dailyLimit: 30 }),
+    ).resolves.toEqual({ success: true, data: makeTimeLimit() })
+  })
+})
+
+describe("updateTimeLimit — resilience to a Redis outage", () => {
+  it("still returns success when redis.del rejects", async () => {
+    mockAuth.mockResolvedValue(AUTHED_SESSION)
+    const existing = makeTimeLimit()
+    const updated = { ...makeTimeLimit(), isActive: false }
+    mockPrisma.timeLimit.findUnique.mockResolvedValue(existing)
+    mockPrisma.timeLimit.update.mockResolvedValue(updated)
+    mockDel.mockRejectedValueOnce(REDIS_UNREACHABLE)
+
+    await expect(updateTimeLimit(LIMIT_ID, { isActive: false })).resolves.toEqual({
+      success: true,
+      data: updated,
+    })
+  })
+})
+
+describe("deleteTimeLimit — resilience to a Redis outage", () => {
+  it("still returns success when redis.del rejects", async () => {
+    mockAuth.mockResolvedValue(AUTHED_SESSION)
+    mockPrisma.timeLimit.findUnique.mockResolvedValue(makeTimeLimit())
+    mockPrisma.timeLimit.delete.mockResolvedValue(undefined)
+    mockDel.mockRejectedValueOnce(REDIS_UNREACHABLE)
+
+    await expect(deleteTimeLimit(LIMIT_ID)).resolves.toEqual({ success: true })
+  })
+})
+
+describe("createSchedule — resilience to a Redis outage", () => {
+  it("still returns success when redis.del rejects", async () => {
+    mockAuth.mockResolvedValue(AUTHED_SESSION)
+    mockPrisma.timeLimit.findUnique.mockResolvedValue(makeTimeLimit())
+    const created = makeSchedule()
+    mockPrisma.schedule.create.mockResolvedValue(created)
+    mockDel.mockRejectedValueOnce(REDIS_UNREACHABLE)
+
+    await expect(createSchedule(VALID_SCHEDULE_INPUT)).resolves.toEqual({
+      success: true,
+      data: created,
+    })
+  })
+})
+
+describe("updateSchedule — resilience to a Redis outage", () => {
+  it("still returns success when redis.del rejects", async () => {
+    mockAuth.mockResolvedValue(AUTHED_SESSION)
+    mockPrisma.schedule.findUnique.mockResolvedValue(makeSchedule())
+    const updated = makeSchedule()
+    mockPrisma.schedule.update.mockResolvedValue(updated)
+    mockDel.mockRejectedValueOnce(REDIS_UNREACHABLE)
+
+    await expect(updateSchedule(SCHEDULE_ID, { startTime: "10:00" })).resolves.toEqual({
+      success: true,
+      data: updated,
+    })
+  })
+})
+
+describe("deleteSchedule — resilience to a Redis outage", () => {
+  it("still returns success when redis.del rejects", async () => {
+    mockAuth.mockResolvedValue(AUTHED_SESSION)
+    mockPrisma.schedule.findUnique.mockResolvedValue(makeSchedule())
+    mockPrisma.schedule.delete.mockResolvedValue(undefined)
+    mockDel.mockRejectedValueOnce(REDIS_UNREACHABLE)
+
+    await expect(deleteSchedule(SCHEDULE_ID)).resolves.toEqual({ success: true })
+  })
+})
+
+// ---------------------------------------------------------------------------
+// revalidatePath — router cache invalidation (Blocking Engine Thread Lag fix)
+//
+// Regression coverage for the "stale until hard reload" bug: every mutation
+// must invalidate the Next.js router cache for /dashboard so a client-side
+// refresh actually picks up fresh data instead of a stale RSC payload.
+// ---------------------------------------------------------------------------
+
+describe("createTimeLimit — router cache revalidation", () => {
+  it("revalidates /dashboard after a successful creation", async () => {
+    mockAuth.mockResolvedValue(AUTHED_SESSION)
+    mockPrisma.timeLimit.create.mockResolvedValue(makeTimeLimit())
+
+    await createTimeLimit({ domain: "example.com", dailyLimit: 30 })
+
+    expect(mockRevalidatePath).toHaveBeenCalledWith("/dashboard")
+  })
+
+  it("does not revalidate when not authenticated", async () => {
+    mockAuth.mockResolvedValue(null)
+
+    await createTimeLimit({ domain: "example.com", dailyLimit: 30 })
+
+    expect(mockRevalidatePath).not.toHaveBeenCalled()
+  })
+
+  it("does not revalidate on input validation failure", async () => {
+    mockAuth.mockResolvedValue(AUTHED_SESSION)
+
+    await createTimeLimit({ domain: "not a valid domain!!!" })
+
+    expect(mockRevalidatePath).not.toHaveBeenCalled()
+  })
+})
+
+describe("updateTimeLimit — router cache revalidation", () => {
+  it("revalidates /dashboard after a successful update", async () => {
+    mockAuth.mockResolvedValue(AUTHED_SESSION)
+    mockPrisma.timeLimit.findUnique.mockResolvedValue(makeTimeLimit())
+    mockPrisma.timeLimit.update.mockResolvedValue(makeTimeLimit())
+
+    await updateTimeLimit(LIMIT_ID, { isActive: false })
+
+    expect(mockRevalidatePath).toHaveBeenCalledWith("/dashboard")
+  })
+
+  it("does not revalidate when the Prisma transaction throws", async () => {
+    mockAuth.mockResolvedValue(AUTHED_SESSION)
+    mockPrisma.timeLimit.findUnique.mockResolvedValue(makeTimeLimit(OTHER_USER_ID))
+
+    await expect(updateTimeLimit(LIMIT_ID, { isActive: false })).rejects.toThrow()
+
+    expect(mockRevalidatePath).not.toHaveBeenCalled()
+  })
+})
+
+describe("deleteTimeLimit — router cache revalidation", () => {
+  it("revalidates /dashboard after a successful deletion", async () => {
+    mockAuth.mockResolvedValue(AUTHED_SESSION)
+    mockPrisma.timeLimit.findUnique.mockResolvedValue(makeTimeLimit())
+    mockPrisma.timeLimit.delete.mockResolvedValue(undefined)
+
+    await deleteTimeLimit(LIMIT_ID)
+
+    expect(mockRevalidatePath).toHaveBeenCalledWith("/dashboard")
+  })
+
+  it("does not revalidate when the Prisma transaction throws", async () => {
+    mockAuth.mockResolvedValue(AUTHED_SESSION)
+    mockPrisma.timeLimit.findUnique.mockResolvedValue(makeTimeLimit(OTHER_USER_ID))
+
+    await expect(deleteTimeLimit(LIMIT_ID)).rejects.toThrow()
+
+    expect(mockRevalidatePath).not.toHaveBeenCalled()
   })
 })
