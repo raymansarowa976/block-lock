@@ -10,7 +10,8 @@
     "test:watch": "vitest",
     "test:coverage": "vitest run --coverage",
     "test:e2e": "playwright test",
-    "test:artifacts": "vitest run --config vitest.artifacts.config.ts"
+    "test:artifacts": "vitest run --config vitest.artifacts.config.ts",
+    "release": "node scripts/release.mjs"
   },
   "dependencies": {
     "@block-lock/shared-types": "workspace:*"
