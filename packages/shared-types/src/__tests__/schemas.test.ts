@@ -7,6 +7,7 @@ import {
   CreateScheduleForDomainSchema,
   UsageEventSchema,
   AnalyticsBatchSchema,
+  DomainSchema,
 } from "../index"
 
 const VALID_CUID = "clh3q5g0o0000qmij2z3m4n5k"
@@ -256,6 +257,110 @@ describe("Domain garbage inputs (via CreateTimeLimitSchema)", () => {
 
   it("accepts a hyphenated domain", () => {
     expect(parse("my-site.co.uk").success).toBe(true)
+  })
+})
+
+// ---------------------------------------------------------------------------
+// DomainSchema – the single canonical host validator shared with the extension
+// ---------------------------------------------------------------------------
+
+describe("DomainSchema – canonical output", () => {
+  const parse = (domain: string) => DomainSchema.parse(domain)
+
+  it("lowercases the host", () => {
+    expect(parse("Example.COM")).toBe("example.com")
+  })
+
+  it("is idempotent — re-parsing its own output yields the same value", () => {
+    for (const input of ["Example.COM", "bücher.de", "news.bbc.co.uk", "xn--e1afmkfd.xn--p1ai"]) {
+      expect(parse(parse(input))).toBe(parse(input))
+    }
+  })
+
+  it("surfaces the original error message on invalid input", () => {
+    const result = DomainSchema.safeParse("not a domain")
+    expect(result.success).toBe(false)
+    expect(result.error?.issues[0].message).toBe("Invalid domain format")
+  })
+})
+
+describe("DomainSchema – multi-part public suffixes (co.uk style)", () => {
+  const parse = (domain: string) => DomainSchema.safeParse(domain)
+
+  it.each(["bbc.co.uk", "news.bbc.co.uk", "example.com.au", "gov.uk", "foo.bar.co.jp"])(
+    "accepts %s and keeps every label (no truncation to the registrable domain)",
+    (domain) => {
+      const result = parse(domain)
+      expect(result.success).toBe(true)
+      expect(result.data).toBe(domain)
+    },
+  )
+})
+
+describe("DomainSchema – internationalised domain names", () => {
+  const parse = (domain: string) => DomainSchema.safeParse(domain)
+
+  it("converts a Unicode label to punycode", () => {
+    expect(parse("bücher.de").data).toBe("xn--bcher-kva.de")
+  })
+
+  it("converts a Unicode TLD to punycode", () => {
+    expect(parse("пример.рф").data).toBe("xn--e1afmkfd.xn--p1ai")
+  })
+
+  it("converts an IDN under a multi-part suffix", () => {
+    expect(parse("münchen.co.uk").data).toBe("xn--mnchen-3ya.co.uk")
+  })
+
+  it("maps differently-cased Unicode input to the same punycode", () => {
+    expect(parse("BÜCHER.de").data).toBe(parse("bücher.de").data)
+  })
+
+  it("accepts already-punycoded input unchanged", () => {
+    expect(parse("xn--bcher-kva.de").data).toBe("xn--bcher-kva.de")
+  })
+
+  it("treats the Unicode and punycode spellings of a domain as the same value", () => {
+    expect(parse("例え.テスト").data).toBe(parse("xn--r8jz45g.xn--zckzah").data)
+  })
+})
+
+describe("DomainSchema – IP-literal hosts are rejected", () => {
+  it.each([
+    ["dotted IPv4", "192.168.1.1"],
+    ["loopback IPv4", "127.0.0.1"],
+    ["hex-obfuscated IPv4", "0x7f.0.0.1"],
+    ["integer-encoded IPv4", "2130706433"],
+    ["bare IPv6", "::1"],
+    ["bracketed IPv6", "[::1]"],
+    ["full IPv6", "2001:db8::1"],
+  ])("rejects a %s (%s)", (_label, host) => {
+    expect(DomainSchema.safeParse(host).success).toBe(false)
+  })
+})
+
+describe("DomainSchema – input the URL parser would otherwise reinterpret", () => {
+  it.each([
+    ["userinfo", "user@example.com"],
+    ["percent-encoding", "%65xample.com"],
+    ["a backslash", "example.com\\path"],
+    ["surrounding whitespace", " example.com "],
+    ["a trailing dot", "example.com."],
+    ["a leading dot", ".example.com"],
+    ["a numeric TLD", "example.123"],
+  ])("rejects input containing %s", (_label, input) => {
+    expect(DomainSchema.safeParse(input).success).toBe(false)
+  })
+
+  it("rejects a label longer than 63 characters", () => {
+    expect(DomainSchema.safeParse(`${"a".repeat(64)}.com`).success).toBe(false)
+  })
+
+  it("rejects a host longer than 253 characters", () => {
+    const label = "a".repeat(60)
+    const host = `${Array(5).fill(label).join(".")}.com`
+    expect(host.length).toBeGreaterThan(253)
+    expect(DomainSchema.safeParse(host).success).toBe(false)
   })
 })
 

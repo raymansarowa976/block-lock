@@ -1,10 +1,13 @@
-const VALID_DOMAIN = /^(?:[a-zA-Z0-9](?:[a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?\.)+[a-zA-Z]{2,}$/
+import { DomainSchema } from "@block-lock/shared-types"
 
+// Strips URL parts the user may have pasted, then defers to the shared
+// DomainSchema so the extension canonicalises domains exactly as the server does.
 export function sanitiseDomain(raw: string): string | null {
   let d = raw.trim()
   d = d.replace(/^https?:\/\//i, "")
   d = d.split("/")[0].split("?")[0].split("#")[0]
   d = d.split(":")[0]
   d = d.replace(/^\.+|\.+$/g, "")
-  return VALID_DOMAIN.test(d) ? d : null
+  const result = DomainSchema.safeParse(d)
+  return result.success ? result.data : null
 }

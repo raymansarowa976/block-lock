@@ -188,6 +188,24 @@ describe("handleUsageTick – recording usage against the active tab's domain", 
     )
   })
 
+  it("matches a rule domain stored with different casing against the tab's lowercase hostname", async () => {
+    mockStorageGet.mockResolvedValue({ rules: [makeRule({ domain: "Example.COM" })] })
+    mockTabsQuery.mockResolvedValue([{ url: "https://example.com/path" }])
+    await handleUsageTick(new Date(2026, 5, 3))
+    expect(mockStorageSet).toHaveBeenCalledWith({
+      dailyUsage: { "example.com": { date: "2026-06-03", minutesUsed: 1 } },
+    })
+  })
+
+  it("matches a Unicode rule domain against the punycode hostname Chrome reports for the tab", async () => {
+    mockStorageGet.mockResolvedValue({ rules: [makeRule({ domain: "bücher.de" })] })
+    mockTabsQuery.mockResolvedValue([{ url: "https://xn--bcher-kva.de/path" }])
+    await handleUsageTick(new Date(2026, 5, 3))
+    expect(mockStorageSet).toHaveBeenCalledWith({
+      dailyUsage: { "xn--bcher-kva.de": { date: "2026-06-03", minutesUsed: 1 } },
+    })
+  })
+
   it("re-applies block rules using the stored rules after recording usage", async () => {
     const rules = [makeRule({ domain: "example.com" })]
     mockStorageGet.mockResolvedValue({ rules })
