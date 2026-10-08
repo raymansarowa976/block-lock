@@ -53,6 +53,8 @@ export async function applyBlockRules(
     },
     condition: {
       urlFilter: `||${domain}^`,
+      // Deliberately top-level navigations only: iframes and fetch/XHR to a blocked
+      // domain from an allowed page are not blocked. See "Blocking scope" in README.md.
       resourceTypes: [chrome.declarativeNetRequest.ResourceType.MAIN_FRAME],
     },
   }))
