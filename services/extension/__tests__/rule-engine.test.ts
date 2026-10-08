@@ -101,7 +101,7 @@ describe("applyBlockRules – rule structure passed to updateDynamicRules", () =
     expect(addRules[0].action.redirect.extensionPath).toBe("/blocked.html?domain=example.com")
   })
 
-  it("sets resourceTypes to [MAIN_FRAME]", async () => {
+  it("scopes blocking to top-level navigations only (resourceTypes [MAIN_FRAME]) — see README 'Blocking scope'", async () => {
     await applyBlockRules([makeRule("a.com")])
     const { addRules } = mockUpdateDynamicRules.mock.calls[0][0]
     expect(addRules[0].condition.resourceTypes).toEqual(["main_frame"])
