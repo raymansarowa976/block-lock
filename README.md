@@ -10,9 +10,31 @@ A high-performance, open-source productivity tool combining a **Next.js web dash
 
 - Define per-domain blocking rules with optional daily time limits (e.g. "allow Reddit for 20 min/day")
 - Attach time-of-day schedules to rules (e.g. "enforce only on weekdays 9–17")
-- Chrome extension enforces rules at the network level via `declarativeNetRequest` — no page injection, no slowdown
+- Chrome extension enforces rules at the network level via `declarativeNetRequest` — no page injection, no slowdown (top-level page loads only; see [Blocking scope](#blocking-scope))
 - Analytics pipeline streams browsing durations from the extension to the dashboard, charted by day/week/month
 - Dashboard shows total browsing time and time saved by blocking across all tracked domains
+
+---
+
+## Blocking scope
+
+Block Lock blocks **top-level page loads** of a blocked domain: typing it in the address bar, following a link to it, or opening it in a new tab. The tab is redirected to Block Lock's blocked page.
+
+It deliberately does **not** block a blocked domain when an allowed page loads it as a sub-resource:
+
+| Loaded from an allowed page as… | Blocked? |
+|---|---|
+| Top-level navigation (address bar, link, new tab) | Yes |
+| Embedded `<iframe>` (e.g. a YouTube embed in a blog post) | No |
+| `fetch` / `XMLHttpRequest`, scripts, images, fonts | No |
+
+This is a stated limitation, not an oversight:
+
+- **Blocking a domain everywhere breaks unrelated sites.** Many distracting domains also serve shared infrastructure. Blocking `google.com` or `youtube.com` everywhere would break Google sign-in, reCAPTCHA, fonts and video embeds on sites you never meant to block.
+- **Time limits are measured the same way.** Daily time limits only count time spent in a tab whose top-level page is that domain. Blocking embeds would block something the time limit never counted.
+- **The blocked page only makes sense for a whole tab.** There's nothing useful to redirect a background request to.
+
+Block Lock adds friction against habitual visits; it isn't a tamper-proof content filter. To change the scope, edit `resourceTypes` in [`services/extension/src/rule-engine.ts`](services/extension/src/rule-engine.ts). Sub-resources would need a separate rule with the `block` action. Redirecting an iframe to the blocked page would also require listing `blocked.html` under `web_accessible_resources`.
 
 ---
 
