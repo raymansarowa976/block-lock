@@ -162,6 +162,18 @@ describe("applyBlockRules – inactive and invalid rules are excluded", () => {
     expect(addRules).toHaveLength(0)
   })
 
+  it("builds an ASCII (punycode) urlFilter for an internationalised domain", async () => {
+    await applyBlockRules([makeRule("bücher.de")])
+    const { addRules } = mockUpdateDynamicRules.mock.calls[0][0]
+    expect(addRules[0].condition.urlFilter).toBe("||xn--bcher-kva.de^")
+  })
+
+  it("emits one rule when time limits differ only in casing", async () => {
+    await applyBlockRules([makeRule("example.com"), makeRule("Example.COM", { id: "rid-2" })])
+    const { addRules } = mockUpdateDynamicRules.mock.calls[0][0]
+    expect(addRules).toHaveLength(1)
+  })
+
   it("sanitises a protocol-prefixed domain before building the urlFilter", async () => {
     await applyBlockRules([makeRule("https://example.com/path")])
     const { addRules } = mockUpdateDynamicRules.mock.calls[0][0]
