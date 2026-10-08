@@ -1,4 +1,5 @@
 import { describe, it, expect } from "vitest"
+import { DomainSchema } from "@block-lock/shared-types"
 import { sanitiseDomain } from "../src/sanitise-domain"
 
 describe("sanitiseDomain – valid inputs pass through clean", () => {
@@ -100,5 +101,63 @@ describe("sanitiseDomain – invalid inputs return null", () => {
 
   it("returns null for a single dot", () => {
     expect(sanitiseDomain(".")).toBeNull()
+  })
+})
+
+describe("sanitiseDomain – canonical form matches the shared DomainSchema", () => {
+  it("lowercases the host", () => {
+    expect(sanitiseDomain("https://Example.COM/path")).toBe("example.com")
+  })
+
+  it.each(["example.com", "Example.COM", "news.bbc.co.uk", "bücher.de", "пример.рф", "xn--bcher-kva.de"])(
+    "produces exactly what the server stores for %s",
+    (domain) => {
+      expect(sanitiseDomain(domain)).toBe(DomainSchema.parse(domain))
+    },
+  )
+
+  it.each(["not a domain", "localhost", "192.168.1.1", "user@example.com", "exam!ple.com"])(
+    "rejects %s just as the server does",
+    (domain) => {
+      expect(sanitiseDomain(domain)).toBeNull()
+      expect(DomainSchema.safeParse(domain).success).toBe(false)
+    },
+  )
+
+  it("is idempotent, so re-sanitising a server-stored domain is a no-op", () => {
+    const stored = DomainSchema.parse("Bücher.de")
+    expect(sanitiseDomain(stored)).toBe(stored)
+  })
+})
+
+describe("sanitiseDomain – multi-part public suffixes (co.uk style)", () => {
+  it.each(["bbc.co.uk", "example.com.au", "foo.bar.co.jp"])("keeps every label of %s", (domain) => {
+    expect(sanitiseDomain(`https://${domain}/path`)).toBe(domain)
+  })
+})
+
+describe("sanitiseDomain – internationalised domain names", () => {
+  it("converts a Unicode host inside a URL to punycode", () => {
+    expect(sanitiseDomain("https://bücher.de/path?q=1")).toBe("xn--bcher-kva.de")
+  })
+
+  it("converts a Unicode TLD to punycode", () => {
+    expect(sanitiseDomain("пример.рф")).toBe("xn--e1afmkfd.xn--p1ai")
+  })
+
+  it("matches the hostname Chrome reports for the same IDN tab URL", () => {
+    expect(sanitiseDomain("bücher.de")).toBe(new URL("https://bücher.de/").hostname)
+  })
+})
+
+describe("sanitiseDomain – IP-literal hosts return null", () => {
+  it.each([
+    "http://127.0.0.1:8080/",
+    "0x7f.0.0.1",
+    "2130706433",
+    "[::1]",
+    "http://[2001:db8::1]/path",
+  ])("rejects %s", (input) => {
+    expect(sanitiseDomain(input)).toBeNull()
   })
 })
