@@ -2,6 +2,7 @@ import type { TimeLimit, Schedule } from "@block-lock/shared-types"
 import { sanitiseDomain } from "./sanitise-domain"
 import { getMinutesUsedToday } from "./usage-tracker"
 import { isWithinAnySchedule } from "./schedule-window"
+import { RULE_ID_NAMESPACES, assignRuleIds, isInNamespace } from "./rule-ids"
 
 function groupSchedulesByRule(schedules: Schedule[]): Map<string, Schedule[]> {
   const byRuleId = new Map<string, Schedule[]>()
@@ -40,10 +41,11 @@ export async function applyBlockRules(
   const resolved = await Promise.all(
     rules.filter((r) => r.isActive).map((r) => resolveBlockedDomain(r, schedulesByRule, now)),
   )
-  const domains = resolved.filter((d): d is string => d !== null)
+  const domains = [...new Set(resolved.filter((d): d is string => d !== null))]
+  const ids = assignRuleIds(domains, RULE_ID_NAMESPACES.block)
 
   const addRules = domains.map((domain, index) => ({
-    id: index + 1,
+    id: ids[index],
     priority: 1,
     action: {
       type: chrome.declarativeNetRequest.RuleActionType.REDIRECT,
@@ -56,7 +58,7 @@ export async function applyBlockRules(
   }))
 
   const existing = await chrome.declarativeNetRequest.getDynamicRules()
-  const existingIds = existing.map((r) => r.id)
+  const existingIds = existing.map((r) => r.id).filter((id) => isInNamespace(id, RULE_ID_NAMESPACES.block))
 
   await chrome.declarativeNetRequest.updateDynamicRules({
     removeRuleIds: existingIds,
