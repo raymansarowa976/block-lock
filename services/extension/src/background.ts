@@ -1,4 +1,4 @@
-import { handleExternalMessage, syncRules, type ExtMessage } from "./auth-handler"
+import { handleExternalMessage, handleInternalMessage, syncRules, type ExtMessage } from "./auth-handler"
 import { flushAnalytics, registerFlushAlarm, FLUSH_ALARM } from "./analytics-flush"
 import { registerTabListeners } from "./analytics-buffer"
 import { registerUsageTickAlarm, handleUsageTick, USAGE_TICK_ALARM } from "./usage-monitor"
@@ -23,6 +23,15 @@ chrome.alarms.onAlarm.addListener((alarm) => {
 chrome.runtime.onMessageExternal.addListener(
   (message: ExtMessage, sender, sendResponse) => {
     handleExternalMessage(message, sender, sendResponse)
+    return true // keep channel open for async sendResponse
+  },
+)
+// The popup's "Disconnect" button. Routed through the service worker rather
+// than done in the popup itself so the revoke + clear still completes if the
+// popup closes mid-request.
+chrome.runtime.onMessage.addListener(
+  (message: ExtMessage, sender, sendResponse) => {
+    handleInternalMessage(message, sender, sendResponse)
     return true // keep channel open for async sendResponse
   },
 )
