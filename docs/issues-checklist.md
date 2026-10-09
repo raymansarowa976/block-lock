@@ -90,13 +90,13 @@ submission, P3 is architecture/cost cleanup, P4 is smaller hardening.
 
 ## P4 — Smaller hardening / correctness
 
-- [ ] **Make `declarativeNetRequest` rule IDs stable**
+- [x] **Make `declarativeNetRequest` rule IDs stable**
   - `rule-engine.ts` assigns `id: index + 1` on every rebuild. Works today (paired with `removeRuleIds: existingIds` in the same call) but will collide the moment a second kind of dynamic rule is introduced (e.g. a temporary "unblock for 5 min" override). Namespace or hash-derive IDs instead.
 
-- [ ] **De-duplicate domain-parsing logic**
+- [x] **De-duplicate domain-parsing logic**
   - `services/extension/src/sanitise-domain.ts` and the `Domain` zod regex in `packages/shared-types/src/index.ts` are two independent implementations of the same validation, neither handling IDNs/punycode consistently. Since domain matching is the actual product, a divergence here is a silent blocking bug. Have the extension import the shared schema; add tests for `co.uk`-style multi-part TLDs, IDNs, and IP-literal hosts.
 
-- [ ] **Decide and document the `MAIN_FRAME`-only blocking scope**
+- [x] **Decide and document the `MAIN_FRAME`-only blocking scope**
   - Current rules only match `resourceTypes: [MAIN_FRAME]`, so an embedded iframe or `fetch`/`XHR` to a blocked domain from an allowed page isn't blocked. May be intentional — document it either way as a stated limitation.
 
 - [ ] **Add a local sign-out/disconnect affordance in the popup**
