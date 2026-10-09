@@ -1,10 +1,11 @@
 import { describe, it, expect, vi, beforeEach } from "vitest"
-import { handleExternalMessage, syncRules } from "../src/auth-handler"
+import { handleExternalMessage, handleInternalMessage, syncRules } from "../src/auth-handler"
 
 const mockStorageGet = vi.fn()
 const mockStorageSet = vi.fn()
 
 vi.stubGlobal("chrome", {
+  runtime: { id: "own-extension-id" },
   storage: {
     local: {
       get: mockStorageGet,
@@ -217,6 +218,74 @@ describe("handleExternalMessage – BLOCK_LOCK_SIGNOUT", () => {
         lastSync: null,
       })
     })
+  })
+})
+
+// ---------------------------------------------------------------------------
+// handleInternalMessage — the popup's local "Disconnect" fallback, for when
+// the dashboard is unreachable and so can't send BLOCK_LOCK_SIGNOUT itself.
+// ---------------------------------------------------------------------------
+
+describe("handleInternalMessage – BLOCK_LOCK_SIGNOUT from the popup", () => {
+  const popupSender = { id: "own-extension-id", url: "chrome-extension://own-extension-id/popup.html" }
+
+  it("revokes the stored token server-side and clears local credentials", async () => {
+    mockStorageGet.mockResolvedValue({ token: "signed.tok" })
+    mockFetch.mockResolvedValue({ ok: true, status: 200 })
+    const sendResponse = vi.fn()
+    await handleInternalMessage({ type: "BLOCK_LOCK_SIGNOUT" }, popupSender, sendResponse)
+    expect(mockFetch).toHaveBeenCalledWith(
+      expect.stringContaining("/sync/revoke?token=signed.tok"),
+      expect.objectContaining({ method: "POST" }),
+    )
+    expect(mockStorageSet).toHaveBeenCalledWith({
+      userId: null,
+      token: null,
+      tokenExpiresAt: null,
+      authError: null,
+      lastSync: null,
+    })
+    expect(sendResponse).toHaveBeenCalledWith({ ok: true })
+  })
+
+  it("still clears local credentials when the dashboard/API is unreachable", async () => {
+    mockStorageGet.mockResolvedValue({ token: "signed.tok" })
+    mockFetch.mockRejectedValue(new Error("network failure"))
+    const sendResponse = vi.fn()
+    await handleInternalMessage({ type: "BLOCK_LOCK_SIGNOUT" }, popupSender, sendResponse)
+    expect(mockStorageSet).toHaveBeenCalledWith(
+      expect.objectContaining({ userId: null, token: null }),
+    )
+    expect(sendResponse).toHaveBeenCalledWith({ ok: true })
+  })
+
+  it("rejects messages from another extension", async () => {
+    const sendResponse = vi.fn()
+    await handleInternalMessage({ type: "BLOCK_LOCK_SIGNOUT" }, { id: "other-extension" }, sendResponse)
+    expect(sendResponse).toHaveBeenCalledWith({ ok: false, error: "forbidden" })
+    expect(mockStorageSet).not.toHaveBeenCalled()
+  })
+
+  it("rejects messages sent from a tab context rather than an extension page", async () => {
+    const sendResponse = vi.fn()
+    await handleInternalMessage(
+      { type: "BLOCK_LOCK_SIGNOUT" },
+      { id: "own-extension-id", tab: { id: 1 } },
+      sendResponse,
+    )
+    expect(sendResponse).toHaveBeenCalledWith({ ok: false, error: "forbidden" })
+    expect(mockStorageSet).not.toHaveBeenCalled()
+  })
+
+  it("does not accept BLOCK_LOCK_AUTH internally — credentials only come from the dashboard", async () => {
+    const sendResponse = vi.fn()
+    await handleInternalMessage(
+      { type: "BLOCK_LOCK_AUTH", userId: "u", token: "t", expiresAt: 1 } as never,
+      popupSender,
+      sendResponse,
+    )
+    expect(sendResponse).toHaveBeenCalledWith({ ok: false, error: "unsupported" })
+    expect(mockStorageSet).not.toHaveBeenCalled()
   })
 })
 
