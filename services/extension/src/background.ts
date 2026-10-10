@@ -6,13 +6,22 @@ import { registerUsageTickAlarm, handleUsageTick, USAGE_TICK_ALARM } from "./usa
 const SYNC_ALARM = "sync-rules"
 const SYNC_INTERVAL_MINUTES = 5
 
-chrome.runtime.onInstalled.addListener(() => {
+// Chrome doesn't guarantee alarms survive a browser restart, so they are
+// (re)created on startup as well as on install. chrome.alarms.create with an
+// existing name replaces it, so calling this repeatedly is safe.
+function startBackgroundTasks() {
   chrome.alarms.create(SYNC_ALARM, { periodInMinutes: SYNC_INTERVAL_MINUTES })
   registerFlushAlarm()
   registerUsageTickAlarm()
   syncRules()
-  registerTabListeners()
-})
+}
+
+chrome.runtime.onInstalled.addListener(startBackgroundTasks)
+chrome.runtime.onStartup.addListener(startBackgroundTasks)
+
+// MV3 service workers are torn down when idle; listeners must be attached at
+// the top level so they're present every time the worker wakes up.
+registerTabListeners()
 
 chrome.alarms.onAlarm.addListener((alarm) => {
   if (alarm.name === SYNC_ALARM) syncRules()
