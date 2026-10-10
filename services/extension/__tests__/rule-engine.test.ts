@@ -1,6 +1,7 @@
 import { describe, it, expect, vi, beforeEach } from "vitest"
 import type { TimeLimit, Schedule } from "@block-lock/shared-types"
 import { applyBlockRules } from "../src/rule-engine"
+import { RULE_ID_NAMESPACES, assignRuleIds, isInNamespace } from "../src/rule-ids"
 
 const mockGetDynamicRules = vi.fn()
 const mockUpdateDynamicRules = vi.fn()
@@ -55,10 +56,31 @@ describe("applyBlockRules – rule structure passed to updateDynamicRules", () =
     )
   })
 
-  it("assigns sequential ids starting at 1", async () => {
+  it("assigns ids from the block namespace", async () => {
     await applyBlockRules([makeRule("a.com"), makeRule("b.com")])
     const { addRules } = mockUpdateDynamicRules.mock.calls[0][0]
-    expect(addRules.map((r: { id: number }) => r.id)).toEqual([1, 2])
+    for (const { id } of addRules) expect(isInNamespace(id, RULE_ID_NAMESPACES.block)).toBe(true)
+  })
+
+  it("derives each rule id from its domain so it is stable across rebuilds", async () => {
+    await applyBlockRules([makeRule("a.com"), makeRule("b.com")])
+    await applyBlockRules([makeRule("z.com"), makeRule("b.com")])
+    const first = mockUpdateDynamicRules.mock.calls[0][0].addRules
+    const second = mockUpdateDynamicRules.mock.calls[1][0].addRules
+    expect(second[1].id).toBe(first[1].id)
+    expect(first[1].id).toBe(assignRuleIds(["b.com"], RULE_ID_NAMESPACES.block)[0])
+  })
+
+  it("assigns distinct ids to every rule", async () => {
+    await applyBlockRules([makeRule("a.com"), makeRule("b.com"), makeRule("c.com")])
+    const { addRules } = mockUpdateDynamicRules.mock.calls[0][0]
+    expect(new Set(addRules.map((r: { id: number }) => r.id)).size).toBe(3)
+  })
+
+  it("emits a single rule when several time limits resolve to the same domain", async () => {
+    await applyBlockRules([makeRule("example.com"), makeRule("https://example.com/path", { id: "rid-2" })])
+    const { addRules } = mockUpdateDynamicRules.mock.calls[0][0]
+    expect(addRules).toHaveLength(1)
   })
 
   it("sets priority to 1 on every rule", async () => {
@@ -79,7 +101,7 @@ describe("applyBlockRules – rule structure passed to updateDynamicRules", () =
     expect(addRules[0].action.redirect.extensionPath).toBe("/blocked.html?domain=example.com")
   })
 
-  it("sets resourceTypes to [MAIN_FRAME]", async () => {
+  it("scopes blocking to top-level navigations only (resourceTypes [MAIN_FRAME]) — see README 'Blocking scope'", async () => {
     await applyBlockRules([makeRule("a.com")])
     const { addRules } = mockUpdateDynamicRules.mock.calls[0][0]
     expect(addRules[0].condition.resourceTypes).toEqual(["main_frame"])
@@ -98,6 +120,15 @@ describe("applyBlockRules – existing rule cleanup", () => {
 
   it("passes existing rule ids as removeRuleIds", async () => {
     mockGetDynamicRules.mockResolvedValue([{ id: 7 }, { id: 8 }])
+    await applyBlockRules([makeRule("a.com")])
+    expect(mockUpdateDynamicRules).toHaveBeenCalledWith(
+      expect.objectContaining({ removeRuleIds: [7, 8] }),
+    )
+  })
+
+  it("leaves existing rules outside the block namespace untouched", async () => {
+    const foreignId = RULE_ID_NAMESPACES.block.max + 1
+    mockGetDynamicRules.mockResolvedValue([{ id: 7 }, { id: foreignId }, { id: 8 }])
     await applyBlockRules([makeRule("a.com")])
     expect(mockUpdateDynamicRules).toHaveBeenCalledWith(
       expect.objectContaining({ removeRuleIds: [7, 8] }),
@@ -129,6 +160,18 @@ describe("applyBlockRules – inactive and invalid rules are excluded", () => {
     await applyBlockRules([makeRule("not a domain")])
     const { addRules } = mockUpdateDynamicRules.mock.calls[0][0]
     expect(addRules).toHaveLength(0)
+  })
+
+  it("builds an ASCII (punycode) urlFilter for an internationalised domain", async () => {
+    await applyBlockRules([makeRule("bücher.de")])
+    const { addRules } = mockUpdateDynamicRules.mock.calls[0][0]
+    expect(addRules[0].condition.urlFilter).toBe("||xn--bcher-kva.de^")
+  })
+
+  it("emits one rule when time limits differ only in casing", async () => {
+    await applyBlockRules([makeRule("example.com"), makeRule("Example.COM", { id: "rid-2" })])
+    const { addRules } = mockUpdateDynamicRules.mock.calls[0][0]
+    expect(addRules).toHaveLength(1)
   })
 
   it("sanitises a protocol-prefixed domain before building the urlFilter", async () => {

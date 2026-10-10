@@ -52,21 +52,7 @@ export async function handleExternalMessage(
   }
 
   if (message.type === "BLOCK_LOCK_SIGNOUT") {
-    // Best-effort server-side revocation — the extension has no dashboard
-    // session, only the token itself, so it authenticates the revoke call
-    // with that. Local state is cleared either way; a failed revoke just
-    // means the token rides out its own 15-minute TTL instead of dying
-    // immediately.
-    const { token } = await chrome.storage.local.get(["token"])
-    if (token) {
-      try {
-        await fetch(`${API_BASE}/sync/revoke?token=${token}`, { method: "POST" })
-      } catch {
-        // Network failure — proceed to clear local state regardless.
-      }
-    }
-
-    await chrome.storage.local.set({ ...clearCredential(), authError: null, lastSync: null })
+    await signOut()
     sendResponse({ ok: true })
     return
   }
@@ -75,6 +61,49 @@ export async function handleExternalMessage(
     await syncRules()
     sendResponse({ ok: true })
   }
+}
+
+// Popup-originated messages (chrome.runtime.sendMessage). Only sign-out is
+// accepted here: it's the local "Disconnect" fallback for when the dashboard
+// is unreachable and so can't send BLOCK_LOCK_SIGNOUT itself. Credentials
+// must still only ever arrive from the dashboard via handleExternalMessage.
+export async function handleInternalMessage(
+  message: ExtMessage,
+  sender: { id?: string; tab?: unknown },
+  sendResponse: (response: unknown) => void,
+): Promise<void> {
+  // Extension pages (the popup) have no `tab`; anything with one came from a
+  // tab context rather than our own UI.
+  if (sender.id !== chrome.runtime.id || sender.tab) {
+    sendResponse({ ok: false, error: "forbidden" })
+    return
+  }
+
+  if (message.type === "BLOCK_LOCK_SIGNOUT") {
+    await signOut()
+    sendResponse({ ok: true })
+    return
+  }
+
+  sendResponse({ ok: false, error: "unsupported" })
+}
+
+async function signOut(): Promise<void> {
+  // Best-effort server-side revocation — the extension has no dashboard
+  // session, only the token itself, so it authenticates the revoke call
+  // with that. Local state is cleared either way; a failed revoke just
+  // means the token rides out its own 15-minute TTL instead of dying
+  // immediately.
+  const { token } = await chrome.storage.local.get(["token"])
+  if (token) {
+    try {
+      await fetch(`${API_BASE}/sync/revoke?token=${token}`, { method: "POST" })
+    } catch {
+      // Network failure — proceed to clear local state regardless.
+    }
+  }
+
+  await chrome.storage.local.set({ ...clearCredential(), authError: null, lastSync: null })
 }
 
 export async function syncRules(): Promise<void> {

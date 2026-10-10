@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from "react"
+import React, { useCallback, useEffect, useState } from "react"
 import { DASHBOARD_URL } from "./config"
 
 type StorageState = {
@@ -9,12 +9,29 @@ type StorageState = {
 
 export function Popup(): React.ReactElement {
   const [storage, setStorage] = useState<StorageState | null>(null)
+  const [disconnecting, setDisconnecting] = useState(false)
+
+  const loadStorage = useCallback(async () => {
+    const result = await chrome.storage.local.get(["userId", "lastSync", "authError"])
+    setStorage(result as StorageState)
+  }, [])
 
   useEffect(() => {
-    chrome.storage.local.get(["userId", "lastSync", "authError"]).then((result) => {
-      setStorage(result as StorageState)
-    })
-  }, [])
+    loadStorage()
+  }, [loadStorage])
+
+  // Local fallback for when the dashboard is unreachable: the background
+  // worker revokes the token (best-effort) and clears it from storage.
+  async function handleDisconnect() {
+    setDisconnecting(true)
+    try {
+      await chrome.runtime.sendMessage({ type: "BLOCK_LOCK_SIGNOUT" })
+    } catch {
+      // Worker unavailable — re-reading storage below shows the real state.
+    }
+    await loadStorage()
+    setDisconnecting(false)
+  }
 
   const isBound = Boolean(storage?.userId)
   const isExpired = Boolean(storage?.authError)
@@ -64,6 +81,14 @@ export function Popup(): React.ReactElement {
                 <span>Never synced</span>
               )}
             </div>
+            <button
+              type="button"
+              onClick={handleDisconnect}
+              disabled={disconnecting}
+              className="text-sm text-gray-600 underline hover:text-gray-900 disabled:opacity-50"
+            >
+              {disconnecting ? "Disconnecting…" : "Disconnect"}
+            </button>
           </div>
         ) : (
           <div className="space-y-3">

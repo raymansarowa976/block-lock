@@ -1,4 +1,4 @@
-import { render, screen, waitFor } from "@testing-library/react"
+import { render, screen, waitFor, fireEvent } from "@testing-library/react"
 import { describe, it, expect, vi, beforeEach } from "vitest"
 import React from "react"
 
@@ -6,8 +6,12 @@ import React from "react"
 import { Popup } from "../src/popup"
 
 const mockStorageGet = vi.fn()
+const mockSendMessage = vi.fn()
 
 vi.stubGlobal("chrome", {
+  runtime: {
+    sendMessage: mockSendMessage,
+  },
   storage: {
     local: {
       get: mockStorageGet,
@@ -17,6 +21,7 @@ vi.stubGlobal("chrome", {
 
 beforeEach(() => {
   mockStorageGet.mockReset()
+  mockSendMessage.mockReset().mockResolvedValue({ ok: true })
 })
 
 describe("Popup – account binding states", () => {
@@ -131,5 +136,53 @@ describe("Popup – responsive panel sizing (Tailwind)", () => {
       const heading = screen.getByRole("heading")
       expect(heading.className).toMatch(/\btext-/)
     })
+  })
+})
+describe("Popup – local disconnect fallback", () => {
+  it("shows a Disconnect button when the account is bound", async () => {
+    mockStorageGet.mockResolvedValue({ userId: "user-abc-123" })
+    render(<Popup />)
+    await waitFor(() =>
+      expect(screen.getByRole("button", { name: /disconnect/i })).toBeInTheDocument(),
+    )
+  })
+
+  it("does not show a Disconnect button when the account is unbound", async () => {
+    mockStorageGet.mockResolvedValue({})
+    render(<Popup />)
+    await waitFor(() => expect(screen.getByText(/not connected/i)).toBeInTheDocument())
+    expect(screen.queryByRole("button", { name: /disconnect/i })).not.toBeInTheDocument()
+  })
+
+  it("does not show a Disconnect button when the session has expired (nothing left to disconnect)", async () => {
+    mockStorageGet.mockResolvedValue({ authError: "session_expired" })
+    render(<Popup />)
+    await waitFor(() => expect(screen.getByText(/session expired/i)).toBeInTheDocument())
+    expect(screen.queryByRole("button", { name: /disconnect/i })).not.toBeInTheDocument()
+  })
+
+  it("asks the background worker to sign out when Disconnect is clicked", async () => {
+    mockStorageGet.mockResolvedValue({ userId: "user-abc-123" })
+    render(<Popup />)
+    fireEvent.click(await screen.findByRole("button", { name: /disconnect/i }))
+    await waitFor(() =>
+      expect(mockSendMessage).toHaveBeenCalledWith({ type: "BLOCK_LOCK_SIGNOUT" }),
+    )
+  })
+
+  it("switches to the not-connected state after disconnecting", async () => {
+    mockStorageGet.mockResolvedValueOnce({ userId: "user-abc-123" }).mockResolvedValue({})
+    render(<Popup />)
+    fireEvent.click(await screen.findByRole("button", { name: /disconnect/i }))
+    await waitFor(() => expect(screen.getByText(/not connected/i)).toBeInTheDocument())
+  })
+
+  it("re-reads storage even if the background worker fails to respond", async () => {
+    mockSendMessage.mockRejectedValue(new Error("Could not establish connection"))
+    mockStorageGet.mockResolvedValueOnce({ userId: "user-abc-123" }).mockResolvedValue({ userId: "user-abc-123" })
+    render(<Popup />)
+    fireEvent.click(await screen.findByRole("button", { name: /disconnect/i }))
+    await waitFor(() => expect(mockStorageGet).toHaveBeenCalledTimes(2))
+    expect(screen.getByRole("button", { name: /disconnect/i })).not.toBeDisabled()
   })
 })

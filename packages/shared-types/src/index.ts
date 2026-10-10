@@ -10,13 +10,40 @@ const HHMMTime = z
 
 const DayOfWeek = z.number().int().min(0).max(6)
 
-const Domain = z
-  .string()
-  .min(1)
-  .regex(
-    /^(?:[a-zA-Z0-9](?:[a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?\.)+[a-zA-Z]{2,}$/,
-    "Invalid domain format",
-  )
+// Canonical host: lowercase ASCII labels, IDNs as punycode (incl. xn-- TLDs).
+// The alphabetic/punycode TLD requirement also rules out IPv4 literals.
+const CANONICAL_HOST =
+  /^(?=.{1,253}$)(?:[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?\.)+(?:[a-z]{2,63}|xn--[a-z0-9-]{1,59})$/
+
+// Characters that would make the URL parser read the input as more than a
+// bare host (scheme, path, port, userinfo, percent-escapes) — reject up front.
+const NON_HOST_CHARS = /[\s/\\?#@:%]/
+
+function toCanonicalHost(value: string): string | null {
+  if (value === "" || NON_HOST_CHARS.test(value)) return null
+  let host: string
+  try {
+    // The WHATWG URL parser applies IDNA (Unicode → punycode) and lowercasing,
+    // matching the hostname Chrome reports for a tab and expects in urlFilter.
+    host = new URL(`http://${value}`).hostname
+  } catch {
+    return null
+  }
+  return CANONICAL_HOST.test(host) ? host : null
+}
+
+// Single source of truth for domain validation — the extension imports this
+// too, so whatever the server stores is exactly what the extension matches.
+export const DomainSchema = z.string().transform((value, ctx) => {
+  const host = toCanonicalHost(value)
+  if (host === null) {
+    ctx.addIssue({ code: z.ZodIssueCode.custom, message: "Invalid domain format" })
+    return z.NEVER
+  }
+  return host
+})
+
+const Domain = DomainSchema
 
 // ---------------------------------------------------------------------------
 // DB model schemas — mirror the Prisma models exactly
