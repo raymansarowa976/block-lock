@@ -12,7 +12,8 @@ export const proxy = auth((req) => {
 })
 
 export const config = {
-  // Guard /dashboard/* and /api/* but leave /api/auth/* open for Auth.js
-  // and /api/sync open for the extension service worker (no cookie context)
-  matcher: ["/dashboard/:path*", "/api/((?!auth|sync).*)"],
+  // Guard /dashboard/* and /api/* but leave /api/auth/* open for Auth.js,
+  // and /api/sync and /api/analytics open for the extension service worker
+  // (no cookie context — those routes verify the sync token themselves)
+  matcher: ["/dashboard/:path*", "/api/((?!auth|sync|analytics).*)"],
 }
