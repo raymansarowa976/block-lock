@@ -1,10 +1,18 @@
 import React, { useCallback, useEffect, useState } from "react"
-import { DASHBOARD_URL } from "./config"
+import { API_BASE, DASHBOARD_URL } from "./config"
+import type { SyncError } from "./auth-handler"
 
 type StorageState = {
   userId?: string
   lastSync?: string
   authError?: string | null
+  syncError?: SyncError | null
+}
+
+const SYNC_ERROR_MESSAGES: Record<SyncError, string> = {
+  network: `Last sync failed: couldn't reach ${API_BASE}. Retrying automatically.`,
+  server: "Last sync failed: server error. Retrying automatically.",
+  rules: "Last sync failed: couldn't apply the synced rules. Retrying automatically.",
 }
 
 export function Popup(): React.ReactElement {
@@ -12,12 +20,23 @@ export function Popup(): React.ReactElement {
   const [disconnecting, setDisconnecting] = useState(false)
 
   const loadStorage = useCallback(async () => {
-    const result = await chrome.storage.local.get(["userId", "lastSync", "authError"])
+    const result = await chrome.storage.local.get(["userId", "lastSync", "authError", "syncError"])
     setStorage(result as StorageState)
   }, [])
 
+  // Sync on open rather than showing a result up to 5 minutes stale, and
+  // re-render whenever the background worker writes a new result.
   useEffect(() => {
     loadStorage()
+    chrome.runtime.sendMessage({ type: "BLOCK_LOCK_SYNC_NOW" }).catch(() => {
+      // Worker unavailable — the periodic alarm will sync instead.
+    })
+
+    const onChanged = (_changes: unknown, areaName: string) => {
+      if (areaName === "local") loadStorage()
+    }
+    chrome.storage.onChanged.addListener(onChanged)
+    return () => chrome.storage.onChanged.removeListener(onChanged)
   }, [loadStorage])
 
   // Local fallback for when the dashboard is unreachable: the background
@@ -36,6 +55,7 @@ export function Popup(): React.ReactElement {
   const isBound = Boolean(storage?.userId)
   const isExpired = Boolean(storage?.authError)
   const lastSync = storage?.lastSync
+  const syncError = storage?.syncError
 
   return (
     <div className="w-full min-w-[280px] max-w-[400px] min-h-[200px] p-4 font-sans bg-white">
@@ -79,6 +99,9 @@ export function Popup(): React.ReactElement {
                 <span>Last synced: {new Date(lastSync).toLocaleString()}</span>
               ) : (
                 <span>Never synced</span>
+              )}
+              {syncError && (
+                <p className="mt-1 text-amber-600">{SYNC_ERROR_MESSAGES[syncError]}</p>
               )}
             </div>
             <button
