@@ -1,4 +1,10 @@
-import { handleExternalMessage, handleInternalMessage, syncRules, type ExtMessage } from "./auth-handler"
+import {
+  handleExternalMessage,
+  handleInternalMessage,
+  syncRules,
+  SYNC_RETRY_ALARM,
+  type ExtMessage,
+} from "./auth-handler"
 import { flushAnalytics, registerFlushAlarm, FLUSH_ALARM } from "./analytics-flush"
 import { registerTabListeners } from "./analytics-buffer"
 import { registerUsageTickAlarm, handleUsageTick, USAGE_TICK_ALARM } from "./usage-monitor"
@@ -24,7 +30,7 @@ chrome.runtime.onStartup.addListener(startBackgroundTasks)
 registerTabListeners()
 
 chrome.alarms.onAlarm.addListener((alarm) => {
-  if (alarm.name === SYNC_ALARM) syncRules()
+  if (alarm.name === SYNC_ALARM || alarm.name === SYNC_RETRY_ALARM) syncRules()
   if (alarm.name === FLUSH_ALARM) flushAnalytics()
   if (alarm.name === USAGE_TICK_ALARM) handleUsageTick()
 })

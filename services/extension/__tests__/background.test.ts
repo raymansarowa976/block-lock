@@ -4,6 +4,7 @@ vi.mock("../src/auth-handler", () => ({
   handleExternalMessage: vi.fn(),
   handleInternalMessage: vi.fn(),
   syncRules: vi.fn(),
+  SYNC_RETRY_ALARM: "sync-retry",
 }))
 vi.mock("../src/analytics-flush", () => ({
   flushAnalytics: vi.fn(),
@@ -36,6 +37,7 @@ function event() {
 
 const onInstalled = event()
 const onStartup = event()
+const onAlarm = event()
 const mockAlarmsCreate = vi.fn()
 
 vi.stubGlobal("chrome", {
@@ -47,7 +49,7 @@ vi.stubGlobal("chrome", {
   },
   alarms: {
     create: mockAlarmsCreate,
-    onAlarm: event(),
+    onAlarm,
   },
 })
 
@@ -124,6 +126,13 @@ describe("background – onInstalled", () => {
     expect(mockAlarmsCreate).toHaveBeenCalledWith("sync-rules", { periodInMinutes: 5 })
     expect(registerFlushAlarm).toHaveBeenCalledTimes(1)
     expect(registerUsageTickAlarm).toHaveBeenCalledTimes(1)
+    expect(syncRules).toHaveBeenCalledTimes(1)
+  })
+})
+
+describe("background – sync retry alarm", () => {
+  it("runs syncRules when the retry alarm fires", () => {
+    for (const fn of onAlarm.listeners) fn({ name: "sync-retry" })
     expect(syncRules).toHaveBeenCalledTimes(1)
   })
 })
