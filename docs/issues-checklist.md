@@ -99,10 +99,10 @@ submission, P3 is architecture/cost cleanup, P4 is smaller hardening.
 - [x] **Decide and document the `MAIN_FRAME`-only blocking scope**
   - Current rules only match `resourceTypes: [MAIN_FRAME]`, so an embedded iframe or `fetch`/`XHR` to a blocked domain from an allowed page isn't blocked. May be intentional — document it either way as a stated limitation.
 
-- [ ] **Add a local sign-out/disconnect affordance in the popup**
+- [x] **Add a local sign-out/disconnect affordance in the popup**
   - `BLOCK_LOCK_SIGNOUT` exists as a message type but nothing in `popup.tsx` ever sends it. Confirm the dashboard→extension sign-out round-trip actually works, and add a fallback "disconnect" button in the popup for when the dashboard is unreachable.
 
-- [ ] **Close test gaps around the highest-risk code paths**
+- [x] **Close test gaps around the highest-risk code paths**
   - No test exercises `/api/sync` with a missing/invalid session (arguably because there's currently no session check to test — see P1). No test asserts schedule-window or daily-limit enforcement (because it doesn't exist yet — see P0). E2E suite (`services/extension/e2e/extension.spec.ts`) is a single file. Per this project's TDD workflow: write the failing tests for P0/P1 items first, then implement against them.
 
 ---
