@@ -47,7 +47,7 @@ CWS requires a free-text justification per permission in the dashboard:
 ## 7. Final pass
 
 - [ ] `test` / `test:e2e` / `lint` green on the exact commit you package
-- [ ] MIT `LICENSE` — confirm you're fine shipping this publicly as-is
+- [x] MIT `LICENSE` — confirm you're fine shipping this publicly as-is
 
 ---
 
