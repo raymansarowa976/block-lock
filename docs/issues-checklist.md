@@ -77,13 +77,13 @@ submission, P3 is architecture/cost cleanup, P4 is smaller hardening.
 
 ## P3 — Architecture is heavier than the product needs
 
-- [ ] **Reconsider running Postgres + Prisma + Redis (Upstash) + pgvector + OpenAI + Vercel Cron + Auth.js pre-launch**
+- [x] **Reconsider running Postgres + Prisma + Redis (Upstash) + pgvector + OpenAI + Vercel Cron + Auth.js pre-launch**
   - That's a lot of paid, operable infrastructure for a product with zero deployed users. Each piece is something that can go down, cost money, or need a migration.
 
-- [ ] **Shelve the AI features until P0/P1 are solid**
+- [x] **Shelve the AI features until P0/P1 are solid**
   - `/api/ai/schedule` (NL parsing), `/api/classify` (embedding-based classification), `/api/cron/insights` (weekly AI briefings) are the most speculative, least-validated part of the product and the most exposed to OpenAI cost overruns from a public-facing extension. They're extra attack surface and review surface in service of a feature set that isn't the core value yet.
 
-- [ ] **Pick one deploy target, not two**
+- [x] **Pick one deploy target, not two**
   - Both a `Dockerfile`/`docker-compose.yml` path and a Vercel path exist. Keep Vercel as primary (per README) and only keep Docker if it's actually used for local dev parity — otherwise it's duplicate maintenance this early.
 
 ---
