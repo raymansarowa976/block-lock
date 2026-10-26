@@ -9,25 +9,47 @@ import { redis } from "@/lib/redis"
 // than track every individual token ever minted.
 export const SYNC_TOKEN_TTL_MS = 15 * 60 * 1000 // 15 minutes
 
+// Long-lived credential the extension trades in at /api/sync/refresh for a
+// new access token once no dashboard tab is open to re-mint one for it.
+// Every refresh also rotates it, so an extension that keeps syncing stays
+// connected indefinitely; only one left idle for this long has to re-login.
+export const SYNC_REFRESH_TOKEN_TTL_MS = 30 * 24 * 60 * 60 * 1000 // 30 days
+
+type SyncTokenType = "access" | "refresh"
+
 interface SyncTokenPayload {
   sub: string
   iat: number
   exp: number
+  // Absent on access tokens minted before refresh tokens existed — those
+  // are treated as access tokens.
+  typ?: SyncTokenType
 }
 
 function sign(payload: string): string {
   return createHmac("sha256", process.env.AUTH_SECRET!).update(payload).digest("base64url")
 }
 
+function mint(userId: string, typ: SyncTokenType, ttlMs: number, now: number) {
+  const expiresAt = now + ttlMs
+  const payload: SyncTokenPayload = { sub: userId, iat: now, exp: expiresAt, typ }
+  const encodedPayload = Buffer.from(JSON.stringify(payload)).toString("base64url")
+  return { token: `${encodedPayload}.${sign(encodedPayload)}`, expiresAt }
+}
+
 export function mintSyncToken(
   userId: string,
   now: number = Date.now(),
 ): { token: string; expiresAt: number } {
-  const expiresAt = now + SYNC_TOKEN_TTL_MS
-  const payload: SyncTokenPayload = { sub: userId, iat: now, exp: expiresAt }
-  const encodedPayload = Buffer.from(JSON.stringify(payload)).toString("base64url")
-  const token = `${encodedPayload}.${sign(encodedPayload)}`
-  return { token, expiresAt }
+  return mint(userId, "access", SYNC_TOKEN_TTL_MS, now)
+}
+
+export function mintSyncRefreshToken(
+  userId: string,
+  now: number = Date.now(),
+): { refreshToken: string; refreshExpiresAt: number } {
+  const { token, expiresAt } = mint(userId, "refresh", SYNC_REFRESH_TOKEN_TTL_MS, now)
+  return { refreshToken: token, refreshExpiresAt: expiresAt }
 }
 
 function parseToken(token: string): { encodedPayload: string; signature: string } | null {
@@ -59,14 +81,12 @@ function decodePayload(encodedPayload: string): SyncTokenPayload | null {
   }
 }
 
-// Pure signature + expiry check — no I/O, so it can't tell a revoked token
-// from a live one. Used internally by verifySyncToken, and exported for the
-// revoke endpoint, which needs to recover a token's userId even when the
-// token may already be revoked (e.g. two sign-outs in quick succession).
-export function decodeVerifiedPayload(
-  token: string,
-  now: number = Date.now(),
-): { userId: string } | null {
+function tokenType(payload: SyncTokenPayload): SyncTokenType {
+  return payload.typ === "refresh" ? "refresh" : "access"
+}
+
+// Signature + expiry check, any token type.
+function decodeUnexpired(token: string, now: number): SyncTokenPayload | null {
   const parsed = parseToken(token)
   if (!parsed) return null
   if (!hasValidSignature(parsed.encodedPayload, parsed.signature)) return null
@@ -75,24 +95,37 @@ export function decodeVerifiedPayload(
   if (!payload) return null
   if (now >= payload.exp) return null
 
-  return { userId: payload.sub }
+  return payload
+}
+
+// Pure signature + expiry check — no I/O, so it can't tell a revoked token
+// from a live one. Exported for the revoke endpoint, which needs to recover
+// a token's userId even when the token may already be revoked (e.g. two
+// sign-outs in quick succession). Accepts either token type, so the
+// extension can still revoke with its refresh token after its access token
+// has lapsed.
+export function decodeVerifiedPayload(
+  token: string,
+  now: number = Date.now(),
+): { userId: string } | null {
+  const payload = decodeUnexpired(token, now)
+  return payload ? { userId: payload.sub } : null
 }
 
 function revocationKey(userId: string) {
   return `sync-token:revoked-before:${userId}`
 }
 
-export async function verifySyncToken(
+async function verifyTyped(
   token: string,
-  now: number = Date.now(),
+  typ: SyncTokenType,
+  now: number,
 ): Promise<{ userId: string } | null> {
-  const parsed = parseToken(token)
-  if (!parsed) return null
-  if (!hasValidSignature(parsed.encodedPayload, parsed.signature)) return null
-
-  const payload = decodePayload(parsed.encodedPayload)
+  const payload = decodeUnexpired(token, now)
   if (!payload) return null
-  if (now >= payload.exp) return null
+  // A refresh token must never work as a 30-day access token, and an access
+  // token must never be able to extend itself.
+  if (tokenType(payload) !== typ) return null
 
   const revokedAt = await redis.get<number>(revocationKey(payload.sub))
   if (typeof revokedAt === "number" && payload.iat <= revokedAt) return null
@@ -100,11 +133,26 @@ export async function verifySyncToken(
   return { userId: payload.sub }
 }
 
-// Invalidates every sync token issued for this user up to `now`, e.g. on
-// sign-out. Tokens are stateless and self-verifying, so there's no row to
-// delete for "the" token — instead we record a per-user cutoff and reject
-// anything minted before it. The TTL only needs to cover the longest a
-// pre-cutoff token could otherwise still pass its own expiry check.
+export function verifySyncToken(
+  token: string,
+  now: number = Date.now(),
+): Promise<{ userId: string } | null> {
+  return verifyTyped(token, "access", now)
+}
+
+export function verifySyncRefreshToken(
+  token: string,
+  now: number = Date.now(),
+): Promise<{ userId: string } | null> {
+  return verifyTyped(token, "refresh", now)
+}
+
+// Invalidates every sync token — access and refresh — issued for this user
+// up to `now`, e.g. on sign-out. Tokens are stateless and self-verifying, so
+// there's no row to delete for "the" token — instead we record a per-user
+// cutoff and reject anything minted before it. The TTL only needs to cover
+// the longest a pre-cutoff token could otherwise still pass its own expiry
+// check, which is the refresh token's lifetime.
 export async function revokeSyncTokensFor(userId: string, now: number = Date.now()): Promise<void> {
-  await redis.set(revocationKey(userId), now, { ex: Math.ceil(SYNC_TOKEN_TTL_MS / 1000) })
+  await redis.set(revocationKey(userId), now, { ex: Math.ceil(SYNC_REFRESH_TOKEN_TTL_MS / 1000) })
 }
