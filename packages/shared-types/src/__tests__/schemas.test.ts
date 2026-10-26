@@ -8,6 +8,7 @@ import {
   UsageEventSchema,
   AnalyticsBatchSchema,
   DomainSchema,
+  AIScheduleBlockSchema,
 } from "../index"
 
 const VALID_CUID = "clh3q5g0o0000qmij2z3m4n5k"
@@ -520,5 +521,47 @@ describe("AnalyticsBatchSchema garbage inputs", () => {
         { domain: "another.com", startedAt: 2000, duration: 30 },
       ],
     }).success).toBe(true)
+  })
+})
+// ---------------------------------------------------------------------------
+// Schedule windows — end earlier than start crosses midnight (supported);
+// end equal to start is ambiguous (empty or 24h?) and rejected
+// ---------------------------------------------------------------------------
+
+describe("schedule window start/end", () => {
+  const cases = [
+    ["CreateScheduleSchema", CreateScheduleSchema, { timeLimitId: VALID_CUID, daysOfWeek: [1] }],
+    ["CreateScheduleForDomainSchema", CreateScheduleForDomainSchema, { domain: "example.com", daysOfWeek: [1] }],
+    ["AIScheduleBlockSchema", AIScheduleBlockSchema, { domain: "example.com", daysOfWeek: [1] }],
+  ] as const
+
+  describe.each(cases)("%s", (_name, schema, base) => {
+    it("accepts an overnight window that crosses midnight", () => {
+      expect(schema.safeParse({ ...base, startTime: "22:00", endTime: "06:00" }).success).toBe(true)
+    })
+
+    it("accepts a window ending at midnight", () => {
+      expect(schema.safeParse({ ...base, startTime: "22:00", endTime: "00:00" }).success).toBe(true)
+    })
+
+    it("rejects a window whose end equals its start, reporting the error on endTime", () => {
+      const result = schema.safeParse({ ...base, startTime: "09:00", endTime: "09:00" })
+      expect(result.success).toBe(false)
+      expect(result.error?.issues[0].path).toEqual(["endTime"])
+    })
+  })
+
+  describe("UpdateScheduleSchema", () => {
+    it("rejects an update setting both times to the same value", () => {
+      expect(UpdateScheduleSchema.safeParse({ startTime: "09:00", endTime: "09:00" }).success).toBe(false)
+    })
+
+    it("accepts an update that changes only one of the times", () => {
+      expect(UpdateScheduleSchema.safeParse({ startTime: "09:00" }).success).toBe(true)
+    })
+
+    it("accepts an overnight update", () => {
+      expect(UpdateScheduleSchema.safeParse({ startTime: "22:00", endTime: "06:00" }).success).toBe(true)
+    })
   })
 })
