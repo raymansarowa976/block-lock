@@ -104,3 +104,39 @@ describe("isScheduleOverlapping – symmetry", () => {
     expect(isScheduleOverlapping(a, b)).toBe(isScheduleOverlapping(b, a))
   })
 })
+// ---------------------------------------------------------------------------
+// Overnight windows (end earlier than start) — they run from the start day
+// into the following morning
+// ---------------------------------------------------------------------------
+
+describe("isScheduleOverlapping – overnight windows", () => {
+  it("returns true when another window falls inside the overnight window before midnight", () => {
+    expect(isScheduleOverlapping(w("22:00", "06:00", [1]), w("23:00", "23:30", [1]))).toBe(true)
+  })
+
+  it("returns true when another window on the following day overlaps the after-midnight part", () => {
+    expect(isScheduleOverlapping(w("22:00", "06:00", [1]), w("05:00", "07:00", [2]))).toBe(true)
+  })
+
+  it("returns false for the start day's own early morning, which the window doesn't cover", () => {
+    expect(isScheduleOverlapping(w("22:00", "06:00", [1]), w("05:00", "07:00", [1]))).toBe(false)
+  })
+
+  it("returns false for a window that starts exactly when the overnight window ends", () => {
+    expect(isScheduleOverlapping(w("22:00", "06:00", [1]), w("06:00", "09:00", [2]))).toBe(false)
+  })
+
+  it("wraps a Saturday-night window into Sunday morning", () => {
+    expect(isScheduleOverlapping(w("22:00", "06:00", [6]), w("01:00", "02:00", [0]))).toBe(true)
+  })
+
+  it("returns true for two overnight windows starting on the same day", () => {
+    expect(isScheduleOverlapping(w("22:00", "06:00", [3]), w("23:00", "01:00", [3]))).toBe(true)
+  })
+
+  it("is symmetric for overnight windows", () => {
+    const a = w("22:00", "06:00", [1])
+    const b = w("05:00", "07:00", [2])
+    expect(isScheduleOverlapping(a, b)).toBe(isScheduleOverlapping(b, a))
+  })
+})
