@@ -113,6 +113,23 @@ describe("handleExternalMessage – BLOCK_LOCK_AUTH", () => {
     )
   })
 
+  it("stores the refresh token so the extension can renew its access token after the dashboard closes", async () => {
+    await handleExternalMessage(
+      {
+        type: "BLOCK_LOCK_AUTH",
+        userId: "user-abc",
+        token: "signed.tok",
+        expiresAt: 999,
+        refreshToken: "signed.refresh",
+      },
+      validSender,
+      vi.fn(),
+    )
+    expect(mockStorageSet).toHaveBeenCalledWith(
+      expect.objectContaining({ refreshToken: "signed.refresh" }),
+    )
+  })
+
   it("clears any previous authError when binding succeeds", async () => {
     mockStorageSet.mockResolvedValue(undefined)
     await handleExternalMessage(
@@ -177,6 +194,7 @@ describe("handleExternalMessage – BLOCK_LOCK_SIGNOUT", () => {
       userId: null,
       token: null,
       tokenExpiresAt: null,
+      refreshToken: null,
       authError: null,
       lastSync: null,
       syncError: null,
@@ -211,6 +229,16 @@ describe("handleExternalMessage – BLOCK_LOCK_SIGNOUT", () => {
       )
     })
 
+    it("revokes with the refresh token when one is stored, since the access token may already have expired", async () => {
+      mockStorageGet.mockResolvedValue({ token: "signed.tok", refreshToken: "signed.refresh" })
+      mockFetch.mockResolvedValue({ ok: true, status: 200 })
+      await handleExternalMessage({ type: "BLOCK_LOCK_SIGNOUT" }, validSender, vi.fn())
+      expect(mockFetch).toHaveBeenCalledWith(
+        expect.stringContaining("/sync/revoke?token=signed.refresh"),
+        expect.objectContaining({ method: "POST" }),
+      )
+    })
+
     it("does not call fetch when there is no stored token to revoke", async () => {
       mockStorageGet.mockResolvedValue({})
       await handleExternalMessage({ type: "BLOCK_LOCK_SIGNOUT" }, validSender, vi.fn())
@@ -226,6 +254,7 @@ describe("handleExternalMessage – BLOCK_LOCK_SIGNOUT", () => {
         userId: null,
         token: null,
         tokenExpiresAt: null,
+        refreshToken: null,
         authError: null,
         lastSync: null,
         syncError: null,
@@ -241,6 +270,7 @@ describe("handleExternalMessage – BLOCK_LOCK_SIGNOUT", () => {
         userId: null,
         token: null,
         tokenExpiresAt: null,
+        refreshToken: null,
         authError: null,
         lastSync: null,
         syncError: null,
@@ -270,6 +300,7 @@ describe("handleInternalMessage – BLOCK_LOCK_SIGNOUT from the popup", () => {
       userId: null,
       token: null,
       tokenExpiresAt: null,
+      refreshToken: null,
       authError: null,
       lastSync: null,
       syncError: null,
@@ -419,6 +450,7 @@ describe("syncRules – auth error handling", () => {
       userId: null,
       token: null,
       tokenExpiresAt: null,
+      refreshToken: null,
     })
   })
 
@@ -431,6 +463,7 @@ describe("syncRules – auth error handling", () => {
       userId: null,
       token: null,
       tokenExpiresAt: null,
+      refreshToken: null,
     })
   })
 
@@ -452,7 +485,72 @@ describe("syncRules – auth error handling", () => {
       userId: null,
       token: null,
       tokenExpiresAt: null,
+      refreshToken: null,
     })
+  })
+})
+
+// The access token only lives 15 minutes and used to be renewed solely by an
+// open dashboard tab, so syncing died ~15 minutes after the tab closed. The
+// extension now renews it itself with its refresh token.
+describe("syncRules – renewing an expired access token", () => {
+  const expiredWithRefresh = () => ({
+    token: "old.tok",
+    tokenExpiresAt: Date.now() - 1,
+    refreshToken: "signed.refresh",
+  })
+
+  function routeFetch(refresh: unknown) {
+    mockFetch.mockImplementation(async (url: string) => {
+      if (url.includes("/sync/refresh")) {
+        if (refresh instanceof Error) throw refresh
+        return refresh
+      }
+      return { ok: true, status: 200, json: async () => ({ rules: [], schedules: [] }) }
+    })
+  }
+
+  it("keeps syncing after the dashboard has closed and the access token has lapsed", async () => {
+    mockStorageGet.mockResolvedValue(expiredWithRefresh())
+    routeFetch({
+      ok: true,
+      status: 200,
+      json: async () => ({ token: "new.tok", expiresAt: Date.now() + 900_000, refreshToken: "new.refresh" }),
+    })
+    await syncRules()
+    expect(mockFetch).toHaveBeenCalledWith(expect.stringContaining("/sync?token=new.tok"))
+    expect(mockApplyBlockRules).toHaveBeenCalledWith([], [])
+    expect(mockStorageSet).not.toHaveBeenCalledWith(
+      expect.objectContaining({ authError: "session_expired" }),
+    )
+  })
+
+  it("expires the session without syncing or retrying when the refresh token is rejected", async () => {
+    mockStorageGet.mockResolvedValue(expiredWithRefresh())
+    routeFetch({ ok: false, status: 401 })
+    await syncRules()
+    expect(mockFetch).toHaveBeenCalledTimes(1)
+    expect(mockStorageSet).toHaveBeenCalledWith(
+      expect.objectContaining({ authError: "session_expired", refreshToken: null }),
+    )
+    expect(mockAlarmsCreate).not.toHaveBeenCalled()
+  })
+
+  it("records a network syncError and schedules a retry when the refresh call can't reach the server", async () => {
+    mockStorageGet.mockResolvedValue(expiredWithRefresh())
+    routeFetch(new TypeError("Failed to fetch"))
+    await syncRules()
+    expect(mockStorageSet).toHaveBeenCalledWith(expect.objectContaining({ syncError: "network" }))
+    expect(mockAlarmsCreate).toHaveBeenCalledWith(SYNC_RETRY_ALARM, expect.anything())
+    expect(mockApplyBlockRules).not.toHaveBeenCalled()
+  })
+
+  it("records a server syncError and schedules a retry on a non-auth refresh failure", async () => {
+    mockStorageGet.mockResolvedValue(expiredWithRefresh())
+    routeFetch({ ok: false, status: 500 })
+    await syncRules()
+    expect(mockStorageSet).toHaveBeenCalledWith(expect.objectContaining({ syncError: "server" }))
+    expect(mockAlarmsCreate).toHaveBeenCalledWith(SYNC_RETRY_ALARM, expect.anything())
   })
 })
 

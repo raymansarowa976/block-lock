@@ -105,7 +105,40 @@ describe("flushAnalytics – locally expired token", () => {
       userId: null,
       token: null,
       tokenExpiresAt: null,
+      refreshToken: null,
     })
+  })
+})
+
+describe("flushAnalytics – renewing an expired access token", () => {
+  const expiredWithRefresh = {
+    token: "old.tok",
+    tokenExpiresAt: Date.now() - 1,
+    refreshToken: "signed.refresh",
+    analyticsBuffer: BUFFER,
+  }
+
+  it("renews the token with the refresh token and flushes with the new one", async () => {
+    mockStorageGet.mockResolvedValue(expiredWithRefresh)
+    mockFetch.mockImplementation(async (url: string) =>
+      url.includes("/sync/refresh")
+        ? { ok: true, status: 200, json: async () => ({ token: "new.tok", expiresAt: 1, refreshToken: "r2" }) }
+        : { ok: true, status: 201 },
+    )
+    await flushAnalytics()
+    expect(mockFetch).toHaveBeenCalledWith(
+      expect.stringContaining("/api/analytics?token=new.tok"),
+      expect.objectContaining({ method: "POST" }),
+    )
+    expect(mockStorageSet).toHaveBeenCalledWith({ analyticsBuffer: [] })
+  })
+
+  it("leaves the buffer and credential intact when the refresh call can't reach the server", async () => {
+    mockStorageGet.mockResolvedValue(expiredWithRefresh)
+    mockFetch.mockRejectedValue(new TypeError("Failed to fetch"))
+    await flushAnalytics()
+    expect(mockFetch).toHaveBeenCalledTimes(1)
+    expect(mockStorageSet).not.toHaveBeenCalled()
   })
 })
 
@@ -221,6 +254,7 @@ describe("flushAnalytics – server rejects the token", () => {
       userId: null,
       token: null,
       tokenExpiresAt: null,
+      refreshToken: null,
     })
   })
 
@@ -232,6 +266,7 @@ describe("flushAnalytics – server rejects the token", () => {
       userId: null,
       token: null,
       tokenExpiresAt: null,
+      refreshToken: null,
     })
   })
 
