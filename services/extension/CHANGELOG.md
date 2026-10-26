@@ -7,6 +7,10 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and 
 ## [Unreleased]
 
 ### Fixed
+- Schedules that cross midnight (e.g. 22:00–06:00) now block. Previously they never matched, so the
+  site was never blocked. The window runs from each selected day into the next morning.
+
+### Fixed
 - Rule changes keep syncing after the dashboard tab is closed. The extension now renews its own
   sync credential instead of showing "session expired" about 15 minutes after the tab closes.
   Signing out still revokes it immediately.

@@ -133,8 +133,22 @@ export async function updateSchedule(id: string, raw: unknown) {
       include: { timeLimit: true },
     })
     if (!existing || existing.timeLimit.userId !== userId) throw new Error("Not found")
+
+    // The schema only sees the fields being changed, so a start === end
+    // window can still arise against the stored time.
+    const startTime = parsed.data.startTime ?? existing.startTime
+    const endTime = parsed.data.endTime ?? existing.endTime
+    if (startTime === endTime) return null
+
     return tx.schedule.update({ where: { id }, data: parsed.data })
   })
+
+  if (!schedule) {
+    return {
+      success: false as const,
+      error: { endTime: ["End time must be different from the start time"] },
+    }
+  }
 
   await invalidateRulesCache(userId)
   revalidatePath("/dashboard")
