@@ -6,6 +6,11 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and 
 
 ## [Unreleased]
 
+### Fixed
+- Rule changes keep syncing after the dashboard tab is closed. The extension now renews its own
+  sync credential instead of showing "session expired" about 15 minutes after the tab closes.
+  Signing out still revokes it immediately.
+
 ## [0.1.0] - 2026-10-04
 
 First version submitted to the Chrome Web Store.
