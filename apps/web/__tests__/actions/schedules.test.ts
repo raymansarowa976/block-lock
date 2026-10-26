@@ -211,6 +211,31 @@ describe("updateSchedule", () => {
     const result = await updateSchedule(SCHEDULE_ID, { daysOfWeek: [0, 6] })
     expect(result).toEqual({ success: true, data: updated })
   })
+
+  it("rejects a partial update that would make the start equal the stored end", async () => {
+    // The schema only sees the fields being changed, so this has to be
+    // checked against the stored schedule (09:00–17:00).
+    mockAuth.mockResolvedValue(AUTHED_SESSION)
+    mockPrisma.schedule.findUnique.mockResolvedValue(makeSchedule())
+
+    const result = await updateSchedule(SCHEDULE_ID, { startTime: "17:00" })
+    expect(result).toEqual({
+      success: false,
+      error: { endTime: ["End time must be different from the start time"] },
+    })
+    expect(mockPrisma.schedule.update).not.toHaveBeenCalled()
+  })
+
+  it("allows a partial update that turns the stored window into an overnight one", async () => {
+    mockAuth.mockResolvedValue(AUTHED_SESSION)
+    const existing = makeSchedule()
+    const updated = { ...existing, startTime: "22:00" }
+    mockPrisma.schedule.findUnique.mockResolvedValue(existing)
+    mockPrisma.schedule.update.mockResolvedValue(updated)
+
+    const result = await updateSchedule(SCHEDULE_ID, { startTime: "22:00" })
+    expect(result).toEqual({ success: true, data: updated })
+  })
 })
 
 // ---------------------------------------------------------------------------
