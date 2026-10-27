@@ -3,9 +3,14 @@ import { applyBlockRules } from "./rule-engine"
 import { API_BASE } from "./config"
 import { clearCredential, expireSession, getAccessToken } from "./sync-credential"
 
+// The localhost origin is only trusted by `pnpm dev` builds. Vite inlines
+// MODE, so the string is dropped from the store bundle (checked by
+// build-zip.test.ts). This uses MODE, not DEV, because `vite build --mode
+// development` still sets DEV to false. Keep it in step with
+// manifest-for-mode.mjs.
 export const ALLOWED_ORIGINS = [
   "https://blocklock.app",
-  "http://localhost:3000",
+  ...(import.meta.env.MODE === "development" ? ["http://localhost:3000"] : []),
 ]
 
 // The credential is a short-lived signed token minted from an authenticated

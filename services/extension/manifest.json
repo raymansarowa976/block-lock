@@ -11,8 +11,7 @@
   "host_permissions": ["<all_urls>"],
   "externally_connectable": {
     "matches": [
-      "https://blocklock.app/*",
-      "http://localhost:3000/*"
+      "https://blocklock.app/*"
     ]
   },
   "background": {

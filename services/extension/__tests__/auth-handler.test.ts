@@ -1,4 +1,4 @@
-import { describe, it, expect, vi, beforeEach } from "vitest"
+import { describe, it, expect, vi, beforeEach, afterEach } from "vitest"
 import { handleExternalMessage, handleInternalMessage, syncRules, SYNC_RETRY_ALARM } from "../src/auth-handler"
 import { applyBlockRules } from "../src/rule-engine"
 
@@ -81,15 +81,53 @@ describe("handleExternalMessage – origin validation", () => {
     )
     expect(sendResponse).toHaveBeenCalledWith({ ok: false, error: "forbidden" })
   })
+})
 
-  it("accepts messages from localhost during development", async () => {
-    mockStorageSet.mockResolvedValue(undefined)
+// ALLOWED_ORIGINS is fixed at module load from the Vite build mode, so each
+// case re-imports auth-handler under a stubbed MODE. It keys on MODE rather
+// than DEV because `vite build --mode development` (pnpm dev) still sets DEV
+// to false. The store build must not trust a dashboard on the user's own
+// machine: any local process on :3000 could otherwise hand it a token.
+describe("handleExternalMessage – localhost origin by build mode", () => {
+  beforeEach(() => {
+    vi.resetModules()
+  })
+
+  afterEach(() => {
+    vi.unstubAllEnvs()
+  })
+
+  async function sendAuthFrom(mode: string, url: string) {
+    vi.stubEnv("MODE", mode)
+    const { handleExternalMessage: handle } = await import("../src/auth-handler")
     const sendResponse = vi.fn()
-    await handleExternalMessage(
+    await handle(
       { type: "BLOCK_LOCK_AUTH", userId: "user-123", token: "tok", expiresAt: 1 },
-      { url: "http://localhost:3000/dashboard" },
+      { url },
       sendResponse,
     )
+    return sendResponse
+  }
+
+  it("accepts messages from localhost in development builds", async () => {
+    const sendResponse = await sendAuthFrom("development", "http://localhost:3000/dashboard")
+    expect(sendResponse).toHaveBeenCalledWith({ ok: true })
+  })
+
+  it.each(["production", "test"])("rejects messages from localhost in %s mode", async (mode) => {
+    const sendResponse = await sendAuthFrom(mode, "http://localhost:3000/dashboard")
+    expect(sendResponse).toHaveBeenCalledWith({ ok: false, error: "forbidden" })
+    expect(mockStorageSet).not.toHaveBeenCalled()
+  })
+
+  it("does not list localhost in ALLOWED_ORIGINS for production builds", async () => {
+    vi.stubEnv("MODE", "production")
+    const { ALLOWED_ORIGINS } = await import("../src/auth-handler")
+    expect(ALLOWED_ORIGINS.some((o) => o.includes("localhost"))).toBe(false)
+  })
+
+  it("still accepts messages from the production origin in production builds", async () => {
+    const sendResponse = await sendAuthFrom("production", "https://blocklock.app/dashboard")
     expect(sendResponse).toHaveBeenCalledWith({ ok: true })
   })
 })
