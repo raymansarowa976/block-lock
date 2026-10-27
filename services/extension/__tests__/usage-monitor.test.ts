@@ -12,6 +12,8 @@ const mockStorageGet = vi.fn()
 const mockStorageSet = vi.fn()
 const mockAlarmsCreate = vi.fn()
 const mockTabsQuery = vi.fn()
+const mockWindowsGetLastFocused = vi.fn()
+const mockIdleQueryState = vi.fn()
 
 vi.stubGlobal("chrome", {
   storage: {
@@ -26,6 +28,12 @@ vi.stubGlobal("chrome", {
   tabs: {
     query: mockTabsQuery,
   },
+  windows: {
+    getLastFocused: mockWindowsGetLastFocused,
+  },
+  idle: {
+    queryState: mockIdleQueryState,
+  },
 })
 
 beforeEach(() => {
@@ -33,6 +41,8 @@ beforeEach(() => {
   mockStorageSet.mockReset().mockResolvedValue(undefined)
   mockAlarmsCreate.mockReset()
   mockTabsQuery.mockReset().mockResolvedValue([])
+  mockWindowsGetLastFocused.mockReset().mockResolvedValue({ id: 7, focused: true })
+  mockIdleQueryState.mockReset().mockResolvedValue("active")
   mockApplyBlockRules.mockReset().mockResolvedValue(undefined)
 })
 
@@ -136,11 +146,11 @@ describe("handleUsageTick – active-tab usage tracking scope", () => {
     expect(mockTabsQuery).not.toHaveBeenCalled()
   })
 
-  it("queries the active tab in the last focused window when a rule has a dailyLimit set", async () => {
+  it("queries the active tab in the focused window when a rule has a dailyLimit set", async () => {
     mockStorageGet.mockResolvedValue({ rules: [makeRule()] })
     mockTabsQuery.mockResolvedValue([{ url: "https://example.com/path" }])
     await handleUsageTick(new Date(2026, 5, 3))
-    expect(mockTabsQuery).toHaveBeenCalledWith({ active: true, lastFocusedWindow: true })
+    expect(mockTabsQuery).toHaveBeenCalledWith({ active: true, windowId: 7 })
   })
 
   it("does not record usage when there is no active tab", async () => {
@@ -225,5 +235,57 @@ describe("handleUsageTick – recording usage against the active tab's domain", 
     expect(mockStorageSet).toHaveBeenCalledWith({
       dailyUsage: { "example.com": { date: "2026-06-03", minutesUsed: 5 } },
     })
+  })
+})
+
+// ---------------------------------------------------------------------------
+// handleUsageTick – only counting time the user is actually on the site
+// ---------------------------------------------------------------------------
+
+describe("handleUsageTick – skipping usage while the user is elsewhere", () => {
+  // The last focused window stays "last focused" after switching to another
+  // app, so focus has to be checked explicitly.
+  it("does not record usage when no Chrome window is focused", async () => {
+    mockStorageGet.mockResolvedValue({ rules: [makeRule({ domain: "example.com" })] })
+    mockWindowsGetLastFocused.mockResolvedValue({ id: 7, focused: false })
+    mockTabsQuery.mockResolvedValue([{ url: "https://example.com/path" }])
+    await handleUsageTick(new Date(2026, 5, 3))
+    expect(mockStorageSet).not.toHaveBeenCalled()
+  })
+
+  it("does not record usage when the screen is locked", async () => {
+    mockStorageGet.mockResolvedValue({ rules: [makeRule({ domain: "example.com" })] })
+    mockIdleQueryState.mockResolvedValue("locked")
+    mockTabsQuery.mockResolvedValue([{ url: "https://example.com/path" }])
+    await handleUsageTick(new Date(2026, 5, 3))
+    expect(mockStorageSet).not.toHaveBeenCalled()
+  })
+
+  // No input for a while is normal when watching a video, which is exactly
+  // the time a daily limit is meant to count.
+  it("still records usage when the user is idle but the screen is not locked", async () => {
+    mockStorageGet.mockResolvedValue({ rules: [makeRule({ domain: "example.com" })] })
+    mockIdleQueryState.mockResolvedValue("idle")
+    mockTabsQuery.mockResolvedValue([{ url: "https://example.com/path" }])
+    await handleUsageTick(new Date(2026, 5, 3))
+    expect(mockStorageSet).toHaveBeenCalledWith({
+      dailyUsage: { "example.com": { date: "2026-06-03", minutesUsed: 1 } },
+    })
+  })
+
+  it("still reapplies block rules when usage is skipped", async () => {
+    const rules = [makeRule()]
+    mockStorageGet.mockResolvedValue({ rules })
+    mockWindowsGetLastFocused.mockResolvedValue({ id: 7, focused: false })
+    const now = new Date(2026, 5, 3)
+    await handleUsageTick(now)
+    expect(mockApplyBlockRules).toHaveBeenCalledWith(rules, [], now)
+  })
+
+  it("does not check focus or lock state when no rule has a dailyLimit set", async () => {
+    mockStorageGet.mockResolvedValue({ rules: [makeRule({ dailyLimit: null })] })
+    await handleUsageTick(new Date(2026, 5, 3))
+    expect(mockWindowsGetLastFocused).not.toHaveBeenCalled()
+    expect(mockIdleQueryState).not.toHaveBeenCalled()
   })
 })

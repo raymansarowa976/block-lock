@@ -5,6 +5,8 @@ import { applyBlockRules } from "./rule-engine"
 
 export const USAGE_TICK_ALARM = "usage-tick"
 const TICK_INTERVAL_MINUTES = 1
+// Only "locked" is treated as away, so this threshold for "idle" never affects counting.
+const IDLE_DETECTION_SECONDS = 60
 
 export function registerUsageTickAlarm(): void {
   chrome.alarms.create(USAGE_TICK_ALARM, { periodInMinutes: TICK_INTERVAL_MINUTES })
@@ -22,7 +24,15 @@ async function recordActiveTabUsage(activeRules: TimeLimit[], now: Date): Promis
   const limited = activeRules.filter((r) => r.isActive && r.dailyLimit !== null)
   if (limited.length === 0) return
 
-  const [activeTab] = await chrome.tabs.query({ active: true, lastFocusedWindow: true })
+  // The last focused window keeps that status after the user switches to another app.
+  const focusedWindow = await chrome.windows.getLastFocused()
+  if (!focusedWindow.focused || focusedWindow.id === undefined) return
+
+  // "idle" is deliberately still counted: watching a video needs no input.
+  const idleState = await chrome.idle.queryState(IDLE_DETECTION_SECONDS)
+  if (idleState === "locked") return
+
+  const [activeTab] = await chrome.tabs.query({ active: true, windowId: focusedWindow.id })
   const hostname = activeTab?.url ? extractHostname(activeTab.url) : null
   const domain = hostname ? sanitiseDomain(hostname) : null
   if (!domain) return

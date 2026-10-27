@@ -67,13 +67,18 @@ describe("Manifest V3 – specification compliance", () => {
     expect(m.permissions).toContain("alarms")
   })
 
+  // usage-monitor.ts skips counting daily-limit minutes while the screen is locked.
+  it("declares idle permission", () => {
+    expect(m.permissions).toContain("idle")
+  })
+
 })
 
 // Store review scrutiny scales with the permissions requested, so the list is
 // pinned exactly — adding one should be a deliberate, justified change.
 describe("Manifest V3 – minimal permission set", () => {
   it("requests only the permissions the extension uses", () => {
-    expect([...m.permissions].sort()).toEqual(["alarms", "declarativeNetRequest", "storage"])
+    expect([...m.permissions].sort()).toEqual(["alarms", "declarativeNetRequest", "idle", "storage"])
   })
 
   // tab.url / changeInfo.url (usage-monitor.ts, analytics-buffer.ts) are

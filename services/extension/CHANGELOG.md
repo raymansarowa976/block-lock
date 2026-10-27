@@ -11,11 +11,16 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and 
   site was never blocked. The window runs from each selected day into the next morning.
 
 ### Fixed
+- Daily time limits only count minutes while a Chrome window is focused and the screen is unlocked.
+  Previously time on a limited site kept counting while you used another app or were away with
+  your computer locked. Watching a video without touching the mouse or keyboard still counts.
 - Rule changes keep syncing after the dashboard tab is closed. The extension now renews its own
   sync credential instead of showing "session expired" about 15 minutes after the tab closes.
   Signing out still revokes it immediately.
 
 ### Security
+- Requests the `idle` permission, used only to check whether the screen is locked so daily limits
+  don't count time while you're away. The lock state is never stored or sent anywhere.
 - The extension no longer accepts sign-in or sync messages from pages on `localhost`. Only the
   Block Lock dashboard at blocklock.app can connect it to an account.
 

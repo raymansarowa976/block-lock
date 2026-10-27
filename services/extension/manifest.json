@@ -6,7 +6,8 @@
   "permissions": [
     "declarativeNetRequest",
     "storage",
-    "alarms"
+    "alarms",
+    "idle"
   ],
   "host_permissions": ["<all_urls>"],
   "externally_connectable": {
