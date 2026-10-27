@@ -4,6 +4,7 @@ import fs from "node:fs"
 import path from "node:path"
 import { fileURLToPath } from "node:url"
 import manifest from "../manifest.json"
+import { manifestForMode, DEV_EXTERNALLY_CONNECTABLE_MATCH } from "../scripts/manifest-for-mode.mjs"
 
 const __dirname = fileURLToPath(new URL(".", import.meta.url))
 const EXTENSION_ROOT = path.join(__dirname, "..")
@@ -123,12 +124,40 @@ describe("Manifest V3 – externally_connectable production origin", () => {
     expect(m.externally_connectable?.matches).toContain("https://blocklock.app/*")
   })
 
-  it("allows messages from localhost during development", () => {
-    expect(m.externally_connectable?.matches).toContain("http://localhost:3000/*")
+  // manifest.json is what ships to the store; the dev origin is only added by
+  // the vite build in development mode (see manifestForMode below).
+  it("does not allow messages from localhost", () => {
+    expect(JSON.stringify(m)).not.toMatch(/localhost|127\.0\.0\.1/)
   })
 
   it("does not allow messages from the retired block-lock.vercel.app domain", () => {
     expect(m.externally_connectable?.matches).not.toContain("https://block-lock.vercel.app/*")
+  })
+})
+
+describe("manifestForMode", () => {
+  it("leaves the production manifest without localhost", () => {
+    const built = manifestForMode(m, "production") as ManifestV3
+    expect(JSON.stringify(built)).not.toMatch(/localhost/)
+    expect(built.externally_connectable?.matches).toEqual(["https://blocklock.app/*"])
+  })
+
+  it("allows messages from localhost in development builds", () => {
+    const built = manifestForMode(m, "development") as ManifestV3
+    expect(built.externally_connectable?.matches).toEqual([
+      "https://blocklock.app/*",
+      DEV_EXTERNALLY_CONNECTABLE_MATCH,
+    ])
+  })
+
+  it("does not mutate the source manifest", () => {
+    const before = JSON.stringify(m)
+    manifestForMode(m, "development")
+    expect(JSON.stringify(m)).toBe(before)
+  })
+
+  it("matches the dev origin trusted by auth-handler", () => {
+    expect(DEV_EXTERNALLY_CONNECTABLE_MATCH).toBe("http://localhost:3000/*")
   })
 })
 
