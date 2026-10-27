@@ -43,4 +43,18 @@ describe("extension production zip archive", () => {
     expect(entries.some((e) => e.includes("node_modules"))).toBe(false)
     expect(entries.some((e) => e.endsWith(".map"))).toBe(false)
   })
+
+  // A dev origin left in the manifest's externally_connectable or in
+  // ALLOWED_ORIGINS would let any local process on :3000 hand the store build
+  // a sync token, so nothing in the shipped zip may mention localhost.
+  it("zip does not reference localhost anywhere", () => {
+    const zip = new AdmZip(EXPECTED_ZIP)
+    const offenders = zip
+      .getEntries()
+      .filter((e: AdmZip.IZipEntry) => !e.isDirectory)
+      .filter((e: AdmZip.IZipEntry) => /localhost/i.test(e.getData().toString("latin1")))
+      .map((e: AdmZip.IZipEntry) => e.entryName)
+
+    expect(offenders).toEqual([])
+  })
 })
