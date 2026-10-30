@@ -22,6 +22,9 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and 
   Signing out still revokes it immediately.
 
 ### Security
+- The sync token is now sent in an `Authorization: Bearer` header instead of the URL when syncing
+  rules, uploading analytics and signing out, so it no longer appears in server or proxy logs.
+  Requires the matching dashboard release; the API no longer accepts `?token=`.
 - Requests the `idle` permission, used only to check whether the screen is locked so daily limits
   don't count time while you're away. The lock state is never stored or sent anywhere.
 - The extension no longer accepts sign-in or sync messages from pages on `localhost`. Only the
