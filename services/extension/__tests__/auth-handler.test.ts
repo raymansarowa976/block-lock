@@ -262,8 +262,11 @@ describe("handleExternalMessage – BLOCK_LOCK_SIGNOUT", () => {
       mockFetch.mockResolvedValue({ ok: true, status: 200 })
       await handleExternalMessage({ type: "BLOCK_LOCK_SIGNOUT" }, validSender, vi.fn())
       expect(mockFetch).toHaveBeenCalledWith(
-        expect.stringContaining("/sync/revoke?token=signed.tok"),
-        expect.objectContaining({ method: "POST" }),
+        expect.stringMatching(/\/sync\/revoke$/),
+        expect.objectContaining({
+          method: "POST",
+          headers: { Authorization: "Bearer signed.tok" },
+        }),
       )
     })
 
@@ -272,8 +275,11 @@ describe("handleExternalMessage – BLOCK_LOCK_SIGNOUT", () => {
       mockFetch.mockResolvedValue({ ok: true, status: 200 })
       await handleExternalMessage({ type: "BLOCK_LOCK_SIGNOUT" }, validSender, vi.fn())
       expect(mockFetch).toHaveBeenCalledWith(
-        expect.stringContaining("/sync/revoke?token=signed.refresh"),
-        expect.objectContaining({ method: "POST" }),
+        expect.stringMatching(/\/sync\/revoke$/),
+        expect.objectContaining({
+          method: "POST",
+          headers: { Authorization: "Bearer signed.refresh" },
+        }),
       )
     })
 
@@ -331,8 +337,11 @@ describe("handleInternalMessage – BLOCK_LOCK_SIGNOUT from the popup", () => {
     const sendResponse = vi.fn()
     await handleInternalMessage({ type: "BLOCK_LOCK_SIGNOUT" }, popupSender, sendResponse)
     expect(mockFetch).toHaveBeenCalledWith(
-      expect.stringContaining("/sync/revoke?token=signed.tok"),
-      expect.objectContaining({ method: "POST" }),
+      expect.stringMatching(/\/sync\/revoke$/),
+      expect.objectContaining({
+        method: "POST",
+        headers: { Authorization: "Bearer signed.tok" },
+      }),
     )
     expect(mockStorageSet).toHaveBeenCalledWith({
       userId: null,
@@ -380,7 +389,10 @@ describe("handleInternalMessage – BLOCK_LOCK_SIGNOUT from the popup", () => {
     mockFetch.mockResolvedValue({ ok: true, status: 200, json: async () => ({ rules: [], schedules: [] }) })
     const sendResponse = vi.fn()
     await handleInternalMessage({ type: "BLOCK_LOCK_SYNC_NOW" }, popupSender, sendResponse)
-    expect(mockFetch).toHaveBeenCalledWith(expect.stringContaining("/sync?token=signed.tok"))
+    expect(mockFetch).toHaveBeenCalledWith(
+      expect.stringMatching(/\/sync$/),
+      { headers: { Authorization: "Bearer signed.tok" } },
+    )
     expect(sendResponse).toHaveBeenCalledWith({ ok: true })
   })
 
@@ -430,7 +442,8 @@ describe("handleExternalMessage – BLOCK_LOCK_RULES_UPDATED", () => {
       vi.fn(),
     )
     expect(mockFetch).toHaveBeenCalledWith(
-      expect.stringContaining("/sync?token=signed.tok"),
+      expect.stringMatching(/\/sync$/),
+      { headers: { Authorization: "Bearer signed.tok" } },
     )
   })
 
@@ -475,8 +488,12 @@ describe("syncRules – auth error handling", () => {
     mockStorageGet.mockResolvedValue({ token: "signed.tok", tokenExpiresAt: Date.now() + 60_000 })
     mockFetch.mockResolvedValue({ ok: false, status: 500 })
     await syncRules()
-    expect(mockFetch).toHaveBeenCalledWith(expect.stringContaining("/sync?token=signed.tok"))
-    expect(mockFetch).not.toHaveBeenCalledWith(expect.stringContaining("userId="))
+    expect(mockFetch).toHaveBeenCalledWith(
+      expect.stringMatching(/\/sync$/),
+      { headers: { Authorization: "Bearer signed.tok" } },
+    )
+    expect(mockFetch).not.toHaveBeenCalledWith(expect.stringContaining("userId="), expect.anything())
+    expect(mockFetch).not.toHaveBeenCalledWith(expect.stringContaining("token="), expect.anything())
   })
 
   it("sets authError and clears the credential when the API responds 401", async () => {
@@ -556,7 +573,10 @@ describe("syncRules – renewing an expired access token", () => {
       json: async () => ({ token: "new.tok", expiresAt: Date.now() + 900_000, refreshToken: "new.refresh" }),
     })
     await syncRules()
-    expect(mockFetch).toHaveBeenCalledWith(expect.stringContaining("/sync?token=new.tok"))
+    expect(mockFetch).toHaveBeenCalledWith(
+      expect.stringMatching(/\/sync$/),
+      { headers: { Authorization: "Bearer new.tok" } },
+    )
     expect(mockApplyBlockRules).toHaveBeenCalledWith([], [])
     expect(mockStorageSet).not.toHaveBeenCalledWith(
       expect.objectContaining({ authError: "session_expired" }),
