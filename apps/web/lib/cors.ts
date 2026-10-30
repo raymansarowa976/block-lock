@@ -10,7 +10,7 @@ export function corsHeaders(origin: string | null): Record<string, string> | nul
   return {
     "Access-Control-Allow-Origin": origin,
     "Access-Control-Allow-Methods": "GET, POST, OPTIONS",
-    "Access-Control-Allow-Headers": "Content-Type",
+    "Access-Control-Allow-Headers": "Content-Type, Authorization",
     "Access-Control-Allow-Credentials": "true",
     Vary: "Origin",
   }

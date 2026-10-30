@@ -123,7 +123,10 @@ async function signOut(): Promise<void> {
   const revokeWith = refreshToken ?? token
   if (revokeWith) {
     try {
-      await fetch(`${API_BASE}/sync/revoke?token=${revokeWith}`, { method: "POST" })
+      await fetch(`${API_BASE}/sync/revoke`, {
+        method: "POST",
+        headers: { Authorization: `Bearer ${revokeWith}` },
+      })
     } catch {
       // Network failure — proceed to clear local state regardless.
     }
@@ -159,7 +162,7 @@ export async function syncRules(): Promise<void> {
   // login from the dashboard can fix those.
   let res: Response
   try {
-    res = await fetch(`${API_BASE}/sync?token=${token}`)
+    res = await fetch(`${API_BASE}/sync`, { headers: { Authorization: `Bearer ${token}` } })
   } catch {
     await recordSyncFailure("network", previousFailures)
     return

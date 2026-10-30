@@ -39,9 +39,9 @@ const REVOCATION_KEY = `sync-token:revoked-before:${USER_ID}`;
 let store: Map<string, unknown>;
 
 function syncRequest(token: string) {
-  return new Request(
-    `http://localhost/api/sync?token=${encodeURIComponent(token)}`
-  );
+  return new Request("http://localhost/api/sync", {
+    headers: { Authorization: `Bearer ${token}` },
+  });
 }
 
 function expectNoDataAccess() {

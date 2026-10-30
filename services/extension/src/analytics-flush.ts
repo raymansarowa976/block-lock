@@ -25,9 +25,9 @@ export async function flushAnalytics(): Promise<void> {
   const { token } = access
 
   try {
-    const res = await fetch(`${API_BASE}/analytics?token=${token}`, {
+    const res = await fetch(`${API_BASE}/analytics`, {
       method: "POST",
-      headers: { "Content-Type": "application/json" },
+      headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
       body: JSON.stringify({ entries: analyticsBuffer as UsageEntry[] }),
     })
 

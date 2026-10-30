@@ -19,9 +19,9 @@ function proxyRunsOn(url: string): boolean {
 
 describe("proxy matcher – extension routes are not intercepted", () => {
   it.each([
-    "/api/sync?token=abc",
-    "/api/sync/revoke?token=abc",
-    "/api/analytics?token=abc",
+    "/api/sync",
+    "/api/sync/revoke",
+    "/api/analytics",
   ])("does not run on %s", (url) => {
     expect(proxyRunsOn(url)).toBe(false)
   })
