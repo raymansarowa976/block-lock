@@ -14,9 +14,8 @@ export async function OPTIONS(request: Request) {
 // refresh tokens along with access tokens (see lib/sync-token.ts), after
 // which this returns 401 and the extension falls back to session_expired.
 //
-// The refresh token travels in the body rather than the query string like
-// the access token does, so the long-lived credential stays out of request
-// logs.
+// The refresh token travels in the body rather than the query string, so the
+// long-lived credential stays out of request logs.
 export async function POST(request: Request) {
   const headers = corsHeaders(request.headers.get("origin")) ?? undefined
 

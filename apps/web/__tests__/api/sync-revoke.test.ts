@@ -18,12 +18,10 @@ const EXTENSION_ID = "ldlmnamnojhcjjnfoodglmcnaedagljl"
 const EXTENSION_ORIGIN = `chrome-extension://${EXTENSION_ID}`
 
 function revokeRequest(token?: string, origin?: string) {
-  const url = token
-    ? `http://localhost/api/sync/revoke?token=${token}`
-    : "http://localhost/api/sync/revoke"
   const headers = new Headers()
+  if (token) headers.set("authorization", `Bearer ${token}`)
   if (origin) headers.set("origin", origin)
-  return new Request(url, { method: "POST", headers })
+  return new Request("http://localhost/api/sync/revoke", { method: "POST", headers })
 }
 
 beforeEach(() => {
@@ -36,9 +34,17 @@ beforeEach(() => {
 })
 
 describe("POST /api/sync/revoke", () => {
-  it("returns 400 when the token query param is absent", async () => {
+  it("returns 400 when the Authorization header is absent", async () => {
     const res = await POST(revokeRequest())
     expect(res.status).toBe(400)
+  })
+
+  it("ignores a token sent in the query string", async () => {
+    const res = await POST(
+      new Request(`http://localhost/api/sync/revoke?token=${VALID_TOKEN}`, { method: "POST" }),
+    )
+    expect(res.status).toBe(400)
+    expect(mockRevoke).not.toHaveBeenCalled()
   })
 
   it("does not revoke anything when the token is missing", async () => {
