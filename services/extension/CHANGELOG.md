@@ -9,6 +9,9 @@ The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and 
 ### Fixed
 - Schedules that cross midnight (e.g. 22:00–06:00) now block. Previously they never matched, so the
   site was never blocked. The window runs from each selected day into the next morning.
+- Browsing analytics no longer lose visits when Chrome suspends the extension's background worker,
+  which happens after about 30 seconds without activity. Closing a tab and switching tabs now
+  record the visit, and time a tab spends in the background is no longer counted.
 
 ### Fixed
 - Daily time limits only count minutes while a Chrome window is focused and the screen is unlocked.
