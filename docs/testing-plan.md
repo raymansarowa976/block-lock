@@ -27,8 +27,8 @@ Write a failing test first, then fix. Add an E2E case to `services/extension/e2e
 ### Fix if time allows (otherwise ship as known issues in 0.1.1)
 
 - [x] **4. Daily limits over-count.** `src/usage-monitor.ts` counts a minute for the active tab of the last-focused window even when Chrome isn't focused or the user is away. Check that a Chrome window is focused, and consider the `idle` permission. Adding a permission is a major version change per RELEASING.md, so weigh this one.
-- [ ] **5. Analytics lose data.** `src/analytics-buffer.ts` keeps open tabs in an in-memory `Map`, which is cleared whenever Chrome shuts down the idle service worker (~30 s). Tab closes and tab switches aren't recorded, and time in background tabs is counted. Store the open-tab state in `chrome.storage.session` and listen to `tabs.onActivated` / `tabs.onRemoved`.
-- [ ] **6. The sync token is sent in the URL.** `?token=` on `/api/sync` and `/api/sync/revoke` ends up in server and proxy logs. Send it in an `Authorization: Bearer` header and update both API routes.
+- [x] **5. Analytics lose data.** `src/analytics-buffer.ts` keeps open tabs in an in-memory `Map`, which is cleared whenever Chrome shuts down the idle service worker (~30 s). Tab closes and tab switches aren't recorded, and time in background tabs is counted. Store the open-tab state in `chrome.storage.session` and listen to `tabs.onActivated` / `tabs.onRemoved`.
+- [x] **6. The sync token is sent in the URL.** `?token=` on `/api/sync` and `/api/sync/revoke` ends up in server and proxy logs. Send it in an `Authorization: Bearer` header and update both API routes.
 
 ### At launch (after the store assigns the ID — see Phase 3)
 
