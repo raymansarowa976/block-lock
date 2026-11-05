@@ -45,7 +45,7 @@ pnpm --filter @block-lock/extension test:artifacts
 
 ---
 
-## Phase 2: Manual testing against production (Oct 26–30)
+## Phase 2: Manual testing against production (Nov 02–06)
 
 Load `services/extension/dist/` unpacked in `chrome://extensions`, pointed at `https://blocklock.app`.
 For each bug: write it down with the steps, the expected and actual result, and the popup state. Fix it test-first and test it again.
@@ -95,7 +95,7 @@ For each bug: write it down with the steps, the expected and actual result, and 
 
 ---
 
-## Phase 3: Private beta (Nov 2–5)
+## Phase 3: Private beta (Nov 9–12)
 
 - [ ] Upload the build as a **Private** or **Unlisted** listing in the Chrome Web Store dashboard
 - [ ] Note the store-assigned extension ID and set `NEXT_PUBLIC_EXTENSION_ID` in Vercel production. Redeploy (bug 7)
@@ -107,7 +107,7 @@ For each bug: write it down with the steps, the expected and actual result, and 
 
 ---
 
-## Phase 4: Final check and submit (Nov 6)
+## Phase 4: Final check and submit (Nov 13)
 
 ### Release steps (from `services/extension/RELEASING.md`)
 - [ ] **Merge `dev` into `main` first.** `main` is behind `dev` and doesn't have the sync retry and popup sync changes
