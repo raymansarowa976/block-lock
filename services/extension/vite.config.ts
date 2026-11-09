@@ -2,9 +2,10 @@ import { defineConfig } from "vite"
 import react from "@vitejs/plugin-react"
 import tailwindcss from "@tailwindcss/vite"
 import { resolve } from "path"
-import { copyFileSync, cpSync } from "fs"
+import { cpSync, readFileSync, writeFileSync } from "fs"
+import { manifestForMode } from "./scripts/manifest-for-mode.mjs"
 
-export default defineConfig({
+export default defineConfig(({ mode }) => ({
   envPrefix: ["VITE_", "NEXT_PUBLIC_"],
   plugins: [
     react(),
@@ -12,9 +13,10 @@ export default defineConfig({
     {
       name: "copy-manifest",
       closeBundle() {
-        copyFileSync(
-          resolve(__dirname, "manifest.json"),
+        const manifest = JSON.parse(readFileSync(resolve(__dirname, "manifest.json"), "utf-8"))
+        writeFileSync(
           resolve(__dirname, "dist/manifest.json"),
+          JSON.stringify(manifestForMode(manifest, mode), null, 2) + "\n",
         )
         cpSync(resolve(__dirname, "icons"), resolve(__dirname, "dist/icons"), {
           recursive: true,
@@ -41,4 +43,4 @@ export default defineConfig({
       },
     },
   },
-})
+}))

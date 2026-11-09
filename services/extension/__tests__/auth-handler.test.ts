@@ -1,8 +1,14 @@
-import { describe, it, expect, vi, beforeEach } from "vitest"
-import { handleExternalMessage, handleInternalMessage, syncRules } from "../src/auth-handler"
+import { describe, it, expect, vi, beforeEach, afterEach } from "vitest"
+import { handleExternalMessage, handleInternalMessage, syncRules, SYNC_RETRY_ALARM } from "../src/auth-handler"
+import { applyBlockRules } from "../src/rule-engine"
+
+vi.mock("../src/rule-engine", () => ({ applyBlockRules: vi.fn() }))
+const mockApplyBlockRules = vi.mocked(applyBlockRules)
 
 const mockStorageGet = vi.fn()
 const mockStorageSet = vi.fn()
+const mockAlarmsCreate = vi.fn()
+const mockAlarmsClear = vi.fn()
 
 vi.stubGlobal("chrome", {
   runtime: { id: "own-extension-id" },
@@ -11,6 +17,10 @@ vi.stubGlobal("chrome", {
       get: mockStorageGet,
       set: mockStorageSet,
     },
+  },
+  alarms: {
+    create: mockAlarmsCreate,
+    clear: mockAlarmsClear,
   },
 })
 
@@ -22,6 +32,9 @@ beforeEach(() => {
   mockStorageGet.mockReset().mockResolvedValue({})
   mockStorageSet.mockReset().mockResolvedValue(undefined)
   mockFetch.mockReset()
+  mockApplyBlockRules.mockReset().mockResolvedValue(undefined)
+  mockAlarmsCreate.mockReset()
+  mockAlarmsClear.mockReset().mockResolvedValue(true)
 })
 
 // ---------------------------------------------------------------------------
@@ -68,15 +81,53 @@ describe("handleExternalMessage – origin validation", () => {
     )
     expect(sendResponse).toHaveBeenCalledWith({ ok: false, error: "forbidden" })
   })
+})
 
-  it("accepts messages from localhost during development", async () => {
-    mockStorageSet.mockResolvedValue(undefined)
+// ALLOWED_ORIGINS is fixed at module load from the Vite build mode, so each
+// case re-imports auth-handler under a stubbed MODE. It keys on MODE rather
+// than DEV because `vite build --mode development` (pnpm dev) still sets DEV
+// to false. The store build must not trust a dashboard on the user's own
+// machine: any local process on :3000 could otherwise hand it a token.
+describe("handleExternalMessage – localhost origin by build mode", () => {
+  beforeEach(() => {
+    vi.resetModules()
+  })
+
+  afterEach(() => {
+    vi.unstubAllEnvs()
+  })
+
+  async function sendAuthFrom(mode: string, url: string) {
+    vi.stubEnv("MODE", mode)
+    const { handleExternalMessage: handle } = await import("../src/auth-handler")
     const sendResponse = vi.fn()
-    await handleExternalMessage(
+    await handle(
       { type: "BLOCK_LOCK_AUTH", userId: "user-123", token: "tok", expiresAt: 1 },
-      { url: "http://localhost:3000/dashboard" },
+      { url },
       sendResponse,
     )
+    return sendResponse
+  }
+
+  it("accepts messages from localhost in development builds", async () => {
+    const sendResponse = await sendAuthFrom("development", "http://localhost:3000/dashboard")
+    expect(sendResponse).toHaveBeenCalledWith({ ok: true })
+  })
+
+  it.each(["production", "test"])("rejects messages from localhost in %s mode", async (mode) => {
+    const sendResponse = await sendAuthFrom(mode, "http://localhost:3000/dashboard")
+    expect(sendResponse).toHaveBeenCalledWith({ ok: false, error: "forbidden" })
+    expect(mockStorageSet).not.toHaveBeenCalled()
+  })
+
+  it("does not list localhost in ALLOWED_ORIGINS for production builds", async () => {
+    vi.stubEnv("MODE", "production")
+    const { ALLOWED_ORIGINS } = await import("../src/auth-handler")
+    expect(ALLOWED_ORIGINS.some((o) => o.includes("localhost"))).toBe(false)
+  })
+
+  it("still accepts messages from the production origin in production builds", async () => {
+    const sendResponse = await sendAuthFrom("production", "https://blocklock.app/dashboard")
     expect(sendResponse).toHaveBeenCalledWith({ ok: true })
   })
 })
@@ -100,6 +151,23 @@ describe("handleExternalMessage – BLOCK_LOCK_AUTH", () => {
     )
   })
 
+  it("stores the refresh token so the extension can renew its access token after the dashboard closes", async () => {
+    await handleExternalMessage(
+      {
+        type: "BLOCK_LOCK_AUTH",
+        userId: "user-abc",
+        token: "signed.tok",
+        expiresAt: 999,
+        refreshToken: "signed.refresh",
+      },
+      validSender,
+      vi.fn(),
+    )
+    expect(mockStorageSet).toHaveBeenCalledWith(
+      expect.objectContaining({ refreshToken: "signed.refresh" }),
+    )
+  })
+
   it("clears any previous authError when binding succeeds", async () => {
     mockStorageSet.mockResolvedValue(undefined)
     await handleExternalMessage(
@@ -109,6 +177,18 @@ describe("handleExternalMessage – BLOCK_LOCK_AUTH", () => {
     )
     expect(mockStorageSet).toHaveBeenCalledWith(
       expect.objectContaining({ authError: null }),
+    )
+  })
+
+  it("clears any previous syncError when binding succeeds", async () => {
+    mockStorageSet.mockResolvedValue(undefined)
+    await handleExternalMessage(
+      { type: "BLOCK_LOCK_AUTH", userId: "user-abc", token: "signed.tok", expiresAt: 999 },
+      validSender,
+      vi.fn(),
+    )
+    expect(mockStorageSet).toHaveBeenCalledWith(
+      expect.objectContaining({ syncError: null, syncFailures: 0 }),
     )
   })
 
@@ -141,7 +221,7 @@ describe("handleExternalMessage – BLOCK_LOCK_AUTH", () => {
 describe("handleExternalMessage – BLOCK_LOCK_SIGNOUT", () => {
   const validSender = { url: "https://blocklock.app/dashboard" }
 
-  it("clears userId, token, tokenExpiresAt, authError and lastSync from storage", async () => {
+  it("clears userId, token, tokenExpiresAt, authError, lastSync and syncError from storage", async () => {
     mockStorageSet.mockResolvedValue(undefined)
     await handleExternalMessage(
       { type: "BLOCK_LOCK_SIGNOUT" },
@@ -152,8 +232,10 @@ describe("handleExternalMessage – BLOCK_LOCK_SIGNOUT", () => {
       userId: null,
       token: null,
       tokenExpiresAt: null,
+      refreshToken: null,
       authError: null,
       lastSync: null,
+      syncError: null,
     })
   })
 
@@ -180,8 +262,24 @@ describe("handleExternalMessage – BLOCK_LOCK_SIGNOUT", () => {
       mockFetch.mockResolvedValue({ ok: true, status: 200 })
       await handleExternalMessage({ type: "BLOCK_LOCK_SIGNOUT" }, validSender, vi.fn())
       expect(mockFetch).toHaveBeenCalledWith(
-        expect.stringContaining("/sync/revoke?token=signed.tok"),
-        expect.objectContaining({ method: "POST" }),
+        expect.stringMatching(/\/sync\/revoke$/),
+        expect.objectContaining({
+          method: "POST",
+          headers: { Authorization: "Bearer signed.tok" },
+        }),
+      )
+    })
+
+    it("revokes with the refresh token when one is stored, since the access token may already have expired", async () => {
+      mockStorageGet.mockResolvedValue({ token: "signed.tok", refreshToken: "signed.refresh" })
+      mockFetch.mockResolvedValue({ ok: true, status: 200 })
+      await handleExternalMessage({ type: "BLOCK_LOCK_SIGNOUT" }, validSender, vi.fn())
+      expect(mockFetch).toHaveBeenCalledWith(
+        expect.stringMatching(/\/sync\/revoke$/),
+        expect.objectContaining({
+          method: "POST",
+          headers: { Authorization: "Bearer signed.refresh" },
+        }),
       )
     })
 
@@ -200,8 +298,10 @@ describe("handleExternalMessage – BLOCK_LOCK_SIGNOUT", () => {
         userId: null,
         token: null,
         tokenExpiresAt: null,
+        refreshToken: null,
         authError: null,
         lastSync: null,
+        syncError: null,
       })
       expect(sendResponse).toHaveBeenCalledWith({ ok: true })
     })
@@ -214,8 +314,10 @@ describe("handleExternalMessage – BLOCK_LOCK_SIGNOUT", () => {
         userId: null,
         token: null,
         tokenExpiresAt: null,
+        refreshToken: null,
         authError: null,
         lastSync: null,
+        syncError: null,
       })
     })
   })
@@ -235,15 +337,20 @@ describe("handleInternalMessage – BLOCK_LOCK_SIGNOUT from the popup", () => {
     const sendResponse = vi.fn()
     await handleInternalMessage({ type: "BLOCK_LOCK_SIGNOUT" }, popupSender, sendResponse)
     expect(mockFetch).toHaveBeenCalledWith(
-      expect.stringContaining("/sync/revoke?token=signed.tok"),
-      expect.objectContaining({ method: "POST" }),
+      expect.stringMatching(/\/sync\/revoke$/),
+      expect.objectContaining({
+        method: "POST",
+        headers: { Authorization: "Bearer signed.tok" },
+      }),
     )
     expect(mockStorageSet).toHaveBeenCalledWith({
       userId: null,
       token: null,
       tokenExpiresAt: null,
+      refreshToken: null,
       authError: null,
       lastSync: null,
+      syncError: null,
     })
     expect(sendResponse).toHaveBeenCalledWith({ ok: true })
   })
@@ -275,6 +382,29 @@ describe("handleInternalMessage – BLOCK_LOCK_SIGNOUT from the popup", () => {
     )
     expect(sendResponse).toHaveBeenCalledWith({ ok: false, error: "forbidden" })
     expect(mockStorageSet).not.toHaveBeenCalled()
+  })
+
+  it("runs a sync immediately when the popup asks for one", async () => {
+    mockStorageGet.mockResolvedValue({ token: "signed.tok", tokenExpiresAt: Date.now() + 60_000 })
+    mockFetch.mockResolvedValue({ ok: true, status: 200, json: async () => ({ rules: [], schedules: [] }) })
+    const sendResponse = vi.fn()
+    await handleInternalMessage({ type: "BLOCK_LOCK_SYNC_NOW" }, popupSender, sendResponse)
+    expect(mockFetch).toHaveBeenCalledWith(
+      expect.stringMatching(/\/sync$/),
+      { headers: { Authorization: "Bearer signed.tok" } },
+    )
+    expect(sendResponse).toHaveBeenCalledWith({ ok: true })
+  })
+
+  it("rejects sync requests from a tab context", async () => {
+    const sendResponse = vi.fn()
+    await handleInternalMessage(
+      { type: "BLOCK_LOCK_SYNC_NOW" },
+      { id: "own-extension-id", tab: { id: 1 } },
+      sendResponse,
+    )
+    expect(sendResponse).toHaveBeenCalledWith({ ok: false, error: "forbidden" })
+    expect(mockFetch).not.toHaveBeenCalled()
   })
 
   it("does not accept BLOCK_LOCK_AUTH internally — credentials only come from the dashboard", async () => {
@@ -312,7 +442,8 @@ describe("handleExternalMessage – BLOCK_LOCK_RULES_UPDATED", () => {
       vi.fn(),
     )
     expect(mockFetch).toHaveBeenCalledWith(
-      expect.stringContaining("/sync?token=signed.tok"),
+      expect.stringMatching(/\/sync$/),
+      { headers: { Authorization: "Bearer signed.tok" } },
     )
   })
 
@@ -357,8 +488,12 @@ describe("syncRules – auth error handling", () => {
     mockStorageGet.mockResolvedValue({ token: "signed.tok", tokenExpiresAt: Date.now() + 60_000 })
     mockFetch.mockResolvedValue({ ok: false, status: 500 })
     await syncRules()
-    expect(mockFetch).toHaveBeenCalledWith(expect.stringContaining("/sync?token=signed.tok"))
-    expect(mockFetch).not.toHaveBeenCalledWith(expect.stringContaining("userId="))
+    expect(mockFetch).toHaveBeenCalledWith(
+      expect.stringMatching(/\/sync$/),
+      { headers: { Authorization: "Bearer signed.tok" } },
+    )
+    expect(mockFetch).not.toHaveBeenCalledWith(expect.stringContaining("userId="), expect.anything())
+    expect(mockFetch).not.toHaveBeenCalledWith(expect.stringContaining("token="), expect.anything())
   })
 
   it("sets authError and clears the credential when the API responds 401", async () => {
@@ -370,6 +505,7 @@ describe("syncRules – auth error handling", () => {
       userId: null,
       token: null,
       tokenExpiresAt: null,
+      refreshToken: null,
     })
   })
 
@@ -382,6 +518,7 @@ describe("syncRules – auth error handling", () => {
       userId: null,
       token: null,
       tokenExpiresAt: null,
+      refreshToken: null,
     })
   })
 
@@ -389,7 +526,9 @@ describe("syncRules – auth error handling", () => {
     mockStorageGet.mockResolvedValue({ token: "signed.tok", tokenExpiresAt: Date.now() + 60_000 })
     mockFetch.mockResolvedValue({ ok: false, status: 500 })
     await syncRules()
-    expect(mockStorageSet).not.toHaveBeenCalled()
+    expect(mockStorageSet).not.toHaveBeenCalledWith(
+      expect.objectContaining({ authError: expect.anything() }),
+    )
   })
 
   it("sets authError and clears the credential locally, without a network call, once the stored token's expiry has passed", async () => {
@@ -401,6 +540,169 @@ describe("syncRules – auth error handling", () => {
       userId: null,
       token: null,
       tokenExpiresAt: null,
+      refreshToken: null,
     })
+  })
+})
+
+// The access token only lives 15 minutes and used to be renewed solely by an
+// open dashboard tab, so syncing died ~15 minutes after the tab closed. The
+// extension now renews it itself with its refresh token.
+describe("syncRules – renewing an expired access token", () => {
+  const expiredWithRefresh = () => ({
+    token: "old.tok",
+    tokenExpiresAt: Date.now() - 1,
+    refreshToken: "signed.refresh",
+  })
+
+  function routeFetch(refresh: unknown) {
+    mockFetch.mockImplementation(async (url: string) => {
+      if (url.includes("/sync/refresh")) {
+        if (refresh instanceof Error) throw refresh
+        return refresh
+      }
+      return { ok: true, status: 200, json: async () => ({ rules: [], schedules: [] }) }
+    })
+  }
+
+  it("keeps syncing after the dashboard has closed and the access token has lapsed", async () => {
+    mockStorageGet.mockResolvedValue(expiredWithRefresh())
+    routeFetch({
+      ok: true,
+      status: 200,
+      json: async () => ({ token: "new.tok", expiresAt: Date.now() + 900_000, refreshToken: "new.refresh" }),
+    })
+    await syncRules()
+    expect(mockFetch).toHaveBeenCalledWith(
+      expect.stringMatching(/\/sync$/),
+      { headers: { Authorization: "Bearer new.tok" } },
+    )
+    expect(mockApplyBlockRules).toHaveBeenCalledWith([], [])
+    expect(mockStorageSet).not.toHaveBeenCalledWith(
+      expect.objectContaining({ authError: "session_expired" }),
+    )
+  })
+
+  it("expires the session without syncing or retrying when the refresh token is rejected", async () => {
+    mockStorageGet.mockResolvedValue(expiredWithRefresh())
+    routeFetch({ ok: false, status: 401 })
+    await syncRules()
+    expect(mockFetch).toHaveBeenCalledTimes(1)
+    expect(mockStorageSet).toHaveBeenCalledWith(
+      expect.objectContaining({ authError: "session_expired", refreshToken: null }),
+    )
+    expect(mockAlarmsCreate).not.toHaveBeenCalled()
+  })
+
+  it("records a network syncError and schedules a retry when the refresh call can't reach the server", async () => {
+    mockStorageGet.mockResolvedValue(expiredWithRefresh())
+    routeFetch(new TypeError("Failed to fetch"))
+    await syncRules()
+    expect(mockStorageSet).toHaveBeenCalledWith(expect.objectContaining({ syncError: "network" }))
+    expect(mockAlarmsCreate).toHaveBeenCalledWith(SYNC_RETRY_ALARM, expect.anything())
+    expect(mockApplyBlockRules).not.toHaveBeenCalled()
+  })
+
+  it("records a server syncError and schedules a retry on a non-auth refresh failure", async () => {
+    mockStorageGet.mockResolvedValue(expiredWithRefresh())
+    routeFetch({ ok: false, status: 500 })
+    await syncRules()
+    expect(mockStorageSet).toHaveBeenCalledWith(expect.objectContaining({ syncError: "server" }))
+    expect(mockAlarmsCreate).toHaveBeenCalledWith(SYNC_RETRY_ALARM, expect.anything())
+  })
+})
+
+// A failed sync used to leave no trace, so the popup sat on "Never synced"
+// with no hint why. Each failure mode now records a syncError for the popup.
+describe("syncRules – sync error reporting", () => {
+  const validToken = () => ({ token: "signed.tok", tokenExpiresAt: Date.now() + 60_000 })
+
+  it("records a network syncError when the API is unreachable, without throwing", async () => {
+    mockStorageGet.mockResolvedValue(validToken())
+    mockFetch.mockRejectedValue(new TypeError("Failed to fetch"))
+    await expect(syncRules()).resolves.toBeUndefined()
+    expect(mockStorageSet).toHaveBeenCalledWith(expect.objectContaining({ syncError: "network" }))
+    expect(mockApplyBlockRules).not.toHaveBeenCalled()
+  })
+
+  it("records a server syncError for non-auth API failures (e.g. 500)", async () => {
+    mockStorageGet.mockResolvedValue(validToken())
+    mockFetch.mockResolvedValue({ ok: false, status: 500 })
+    await syncRules()
+    expect(mockStorageSet).toHaveBeenCalledWith(expect.objectContaining({ syncError: "server" }))
+    expect(mockApplyBlockRules).not.toHaveBeenCalled()
+  })
+
+  it("records a rules syncError when the payload can't be applied, without throwing", async () => {
+    mockStorageGet.mockResolvedValue(validToken())
+    mockFetch.mockResolvedValue({ ok: true, status: 200, json: async () => ({ rules: [], schedules: [] }) })
+    mockApplyBlockRules.mockRejectedValue(new Error("bad rule"))
+    await expect(syncRules()).resolves.toBeUndefined()
+    expect(mockStorageSet).toHaveBeenCalledWith(expect.objectContaining({ syncError: "rules" }))
+  })
+
+  it("clears syncError after a successful sync", async () => {
+    mockStorageGet.mockResolvedValue(validToken())
+    mockFetch.mockResolvedValue({ ok: true, status: 200, json: async () => ({ rules: [], schedules: [] }) })
+    await syncRules()
+    expect(mockApplyBlockRules).toHaveBeenCalledWith([], [])
+    expect(mockStorageSet).toHaveBeenCalledWith(expect.objectContaining({ syncError: null }))
+  })
+})
+
+// The periodic alarm only fires every 5 minutes, so a failed sync gets its own
+// quicker retry with exponential backoff, handing back to the periodic alarm
+// once the backoff reaches its interval.
+describe("syncRules – automatic retry", () => {
+  const validToken = (extra: Record<string, unknown> = {}) => ({
+    token: "signed.tok",
+    tokenExpiresAt: Date.now() + 60_000,
+    ...extra,
+  })
+
+  it("schedules a retry 30 seconds after the first failure", async () => {
+    mockStorageGet.mockResolvedValue(validToken())
+    mockFetch.mockRejectedValue(new TypeError("Failed to fetch"))
+    await syncRules()
+    expect(mockAlarmsCreate).toHaveBeenCalledWith(SYNC_RETRY_ALARM, { delayInMinutes: 0.5 })
+    expect(mockStorageSet).toHaveBeenCalledWith(expect.objectContaining({ syncFailures: 1 }))
+  })
+
+  it.each([
+    [1, 1],
+    [2, 2],
+    [3, 4],
+    [4, 5],
+    [10, 5],
+  ])("backs off after %i previous failures to a %f minute delay", async (previous, delay) => {
+    mockStorageGet.mockResolvedValue(validToken({ syncFailures: previous }))
+    mockFetch.mockResolvedValue({ ok: false, status: 500 })
+    await syncRules()
+    expect(mockAlarmsCreate).toHaveBeenCalledWith(SYNC_RETRY_ALARM, { delayInMinutes: delay })
+    expect(mockStorageSet).toHaveBeenCalledWith(expect.objectContaining({ syncFailures: previous + 1 }))
+  })
+
+  it("schedules a retry when the rules can't be applied", async () => {
+    mockStorageGet.mockResolvedValue(validToken())
+    mockFetch.mockResolvedValue({ ok: true, status: 200, json: async () => ({ rules: [], schedules: [] }) })
+    mockApplyBlockRules.mockRejectedValue(new Error("bad rule"))
+    await syncRules()
+    expect(mockAlarmsCreate).toHaveBeenCalledWith(SYNC_RETRY_ALARM, expect.anything())
+  })
+
+  it("resets the failure count and cancels any pending retry after a successful sync", async () => {
+    mockStorageGet.mockResolvedValue(validToken({ syncFailures: 3 }))
+    mockFetch.mockResolvedValue({ ok: true, status: 200, json: async () => ({ rules: [], schedules: [] }) })
+    await syncRules()
+    expect(mockStorageSet).toHaveBeenCalledWith({ syncError: null, syncFailures: 0 })
+    expect(mockAlarmsClear).toHaveBeenCalledWith(SYNC_RETRY_ALARM)
+    expect(mockAlarmsCreate).not.toHaveBeenCalled()
+  })
+
+  it("does not retry when the session has expired — only a new login can fix that", async () => {
+    mockStorageGet.mockResolvedValue(validToken())
+    mockFetch.mockResolvedValue({ ok: false, status: 401 })
+    await syncRules()
+    expect(mockAlarmsCreate).not.toHaveBeenCalled()
   })
 })

@@ -1,4 +1,5 @@
 import { corsHeaders, handleCorsPreflight } from "@/lib/cors"
+import { bearerToken } from "@/lib/bearer-token"
 import { decodeVerifiedPayload, revokeSyncTokensFor } from "@/lib/sync-token"
 import { NextResponse } from "next/server"
 
@@ -14,8 +15,7 @@ export async function OPTIONS(request: Request) {
 // is accepted here on purpose: revoking twice is harmless.
 export async function POST(request: Request) {
   const headers = corsHeaders(request.headers.get("origin")) ?? undefined
-  const { searchParams } = new URL(request.url)
-  const token = searchParams.get("token")
+  const token = bearerToken(request)
 
   if (!token) {
     return NextResponse.json({ error: "Missing token" }, { status: 400, headers })

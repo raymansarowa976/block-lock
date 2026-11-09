@@ -8,7 +8,7 @@ const SYSTEM_PROMPT = `You translate a user's natural-language focus/scheduling 
 
 Each rule ("block") pairs a single domain with the time window and days of the week it should be blocked:
 - domain: a real, fully-qualified website domain (e.g. "facebook.com", "instagram.com", "youtube.com"). Expand categories like "social media" into the well-known domains they refer to — emit one block per domain.
-- startTime / endTime: 24-hour "HH:MM" strings.
+- startTime / endTime: 24-hour "HH:MM" strings, never equal to each other. An endTime earlier than startTime means the block runs overnight into the next morning (e.g. "22:00"–"06:00"); daysOfWeek then lists the days the block starts on.
 - daysOfWeek: integers 0-6 where 0 = Sunday … 6 = Saturday. Expand phrases like "weekdays" to [1,2,3,4,5] and "weekends" to [0,6].
 
 Always return at least one block. Never invent fields outside the given schema.`

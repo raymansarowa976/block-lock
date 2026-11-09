@@ -24,12 +24,19 @@ const DAYS = [
 
 const HHMMTime = z.string().regex(/^\d{2}:\d{2}$/, "Expected HH:MM format")
 
-const FormSchema = z.object({
-  domain: z.string().min(1, "Enter a website"),
-  startTime: HHMMTime,
-  endTime: HHMMTime,
-  daysOfWeek: z.array(z.number().int().min(0).max(6)).min(1, "Select at least one day"),
-})
+// An end earlier than the start is an overnight window (e.g. 22:00–06:00),
+// which runs into the next morning; an end equal to the start is ambiguous.
+const FormSchema = z
+  .object({
+    domain: z.string().min(1, "Enter a website"),
+    startTime: HHMMTime,
+    endTime: HHMMTime,
+    daysOfWeek: z.array(z.number().int().min(0).max(6)).min(1, "Select at least one day"),
+  })
+  .refine((v) => v.startTime !== v.endTime, {
+    path: ["endTime"],
+    message: "End time must be different from the start time",
+  })
 
 type FormValues = z.infer<typeof FormSchema>
 
@@ -48,11 +55,15 @@ export function ScheduleForm({ timeLimits }: ScheduleFormProps) {
     control,
     reset,
     setError,
+    watch,
     formState: { errors },
   } = useForm<FormValues>({
     resolver: zodResolver(FormSchema),
     defaultValues: { domain: "", startTime: "", endTime: "", daysOfWeek: [] },
   })
+
+  const [startTime, endTime] = watch(["startTime", "endTime"])
+  const endsNextDay = Boolean(startTime && endTime && endTime < startTime)
 
   async function onSubmit(data: FormValues) {
     setIsPending(true)
@@ -141,6 +152,11 @@ export function ScheduleForm({ timeLimits }: ScheduleFormProps) {
             )}
           </div>
         </div>
+        {endsNextDay && (
+          <p className="text-xs text-slate-500">
+            Ends the next day — blocking runs overnight from each selected day.
+          </p>
+        )}
 
         <div className="space-y-1.5">
           <div className="flex items-center gap-1.5">

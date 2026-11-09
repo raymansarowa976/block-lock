@@ -1,206 +1,304 @@
 import { describe, it, expect, vi, beforeEach } from "vitest"
-import { registerTabListeners, trackNavigation } from "../src/analytics-buffer"
+import {
+  registerTabListeners,
+  trackNavigation,
+  trackActivation,
+  trackTabClosed,
+  type UsageEntry,
+} from "../src/analytics-buffer"
 
-const mockStorageGet = vi.fn()
-const mockStorageSet = vi.fn()
+// Both storage areas are backed by plain objects so state written by one call
+// is visible to the next, the same as in Chrome.
+let localStore: Record<string, unknown>
+let sessionStore: Record<string, unknown>
+
+function fakeArea(getStore: () => Record<string, unknown>) {
+  return {
+    get: vi.fn(async (key: string | string[]) => {
+      const keys = Array.isArray(key) ? key : [key]
+      const store = getStore()
+      return Object.fromEntries(keys.filter((k) => k in store).map((k) => [k, store[k]]))
+    }),
+    set: vi.fn(async (items: Record<string, unknown>) => {
+      Object.assign(getStore(), items)
+    }),
+  }
+}
+
+const localArea = fakeArea(() => localStore)
+const sessionArea = fakeArea(() => sessionStore)
+const mockTabsGet = vi.fn()
 const mockTabsOnUpdated = { addListener: vi.fn() }
+const mockTabsOnActivated = { addListener: vi.fn() }
+const mockTabsOnRemoved = { addListener: vi.fn() }
 const mockFetch = vi.fn()
 
 vi.stubGlobal("chrome", {
   storage: {
-    local: {
-      get: mockStorageGet,
-      set: mockStorageSet,
-    },
+    local: localArea,
+    session: sessionArea,
   },
   tabs: {
+    get: mockTabsGet,
     onUpdated: mockTabsOnUpdated,
+    onActivated: mockTabsOnActivated,
+    onRemoved: mockTabsOnRemoved,
   },
 })
 vi.stubGlobal("fetch", mockFetch)
 
-// Each test gets a unique tab ID to prevent cross-test activeTabs Map pollution
-let nextTabId = 0
-
 beforeEach(() => {
-  mockStorageGet.mockReset().mockResolvedValue({ analyticsBuffer: [] })
-  mockStorageSet.mockReset().mockResolvedValue(undefined)
+  localStore = {}
+  sessionStore = {}
+  localArea.get.mockClear()
+  localArea.set.mockClear()
+  sessionArea.get.mockClear()
+  sessionArea.set.mockClear()
+  mockTabsGet.mockReset()
   mockTabsOnUpdated.addListener.mockReset()
+  mockTabsOnActivated.addListener.mockReset()
+  mockTabsOnRemoved.addListener.mockReset()
   mockFetch.mockReset()
-  nextTabId++
 })
 
+function buffer(): UsageEntry[] {
+  return (localStore.analyticsBuffer as UsageEntry[] | undefined) ?? []
+}
+
 // ---------------------------------------------------------------------------
-// registerTabListeners – chrome.tabs.onUpdated binding (acceptance criterion 1)
+// registerTabListeners
 // ---------------------------------------------------------------------------
 
 describe("registerTabListeners – event listener registration", () => {
-  it("attaches a listener to chrome.tabs.onUpdated", () => {
+  it("attaches listeners to tabs.onUpdated, tabs.onActivated and tabs.onRemoved", () => {
     registerTabListeners()
     expect(mockTabsOnUpdated.addListener).toHaveBeenCalledTimes(1)
-    expect(mockTabsOnUpdated.addListener).toHaveBeenCalledWith(expect.any(Function))
+    expect(mockTabsOnActivated.addListener).toHaveBeenCalledTimes(1)
+    expect(mockTabsOnRemoved.addListener).toHaveBeenCalledTimes(1)
   })
 })
 
-describe("registerTabListeners – listener callback behaviour", () => {
-  it("writes to storage when a tab completes loading and the tab was previously tracked", async () => {
+describe("registerTabListeners – onUpdated callback", () => {
+  it("records the previous visit when the active tab finishes loading a new page", async () => {
     registerTabListeners()
     const listener = mockTabsOnUpdated.addListener.mock.calls[0][0]
-    const tabId = nextTabId
-    // Prime the tracker so the next navigation on this tab triggers a storage write
-    await trackNavigation(tabId, "https://prime.com/", 0)
-    mockStorageGet.mockResolvedValue({ analyticsBuffer: [] })
-    await listener(tabId, { status: "complete", url: "https://example.com/" }, {})
-    expect(mockStorageSet).toHaveBeenCalled()
+    await trackNavigation(1, "https://prime.com/", 0)
+    await listener(1, { status: "complete", url: "https://example.com/" }, { active: true })
+    expect(buffer()).toHaveLength(1)
+    expect(buffer()[0].domain).toBe("prime.com")
+  })
+
+  it("ignores page loads in background tabs", async () => {
+    registerTabListeners()
+    const listener = mockTabsOnUpdated.addListener.mock.calls[0][0]
+    await trackNavigation(1, "https://prime.com/", 0)
+    await listener(2, { status: "complete", url: "https://example.com/" }, { active: false })
+    expect(buffer()).toHaveLength(0)
+    expect(sessionStore.activeVisit).toMatchObject({ tabId: 1, domain: "prime.com" })
   })
 
   it("ignores onUpdated events that carry no URL in changeInfo", async () => {
     registerTabListeners()
     const listener = mockTabsOnUpdated.addListener.mock.calls[0][0]
-    await listener(nextTabId, { status: "complete" }, {})
-    expect(mockStorageSet).not.toHaveBeenCalled()
+    await listener(1, { status: "complete" }, { active: true })
+    expect(sessionArea.set).not.toHaveBeenCalled()
   })
 
   it("ignores onUpdated events whose status is not 'complete'", async () => {
     registerTabListeners()
     const listener = mockTabsOnUpdated.addListener.mock.calls[0][0]
-    await listener(nextTabId, { status: "loading", url: "https://example.com/" }, {})
-    expect(mockStorageSet).not.toHaveBeenCalled()
+    await listener(1, { status: "loading", url: "https://example.com/" }, { active: true })
+    expect(sessionArea.set).not.toHaveBeenCalled()
+  })
+})
+
+describe("registerTabListeners – onActivated callback", () => {
+  it("records the previous tab's visit when the user switches tabs", async () => {
+    registerTabListeners()
+    const listener = mockTabsOnActivated.addListener.mock.calls[0][0]
+    mockTabsGet.mockResolvedValue({ id: 2, url: "https://b.com/" })
+    await trackNavigation(1, "https://a.com/", 0)
+    await listener({ tabId: 2, windowId: 1 })
+    expect(mockTabsGet).toHaveBeenCalledWith(2)
+    expect(buffer()[0].domain).toBe("a.com")
+  })
+})
+
+describe("registerTabListeners – onRemoved callback", () => {
+  it("records the visit when the active tab is closed", async () => {
+    registerTabListeners()
+    const listener = mockTabsOnRemoved.addListener.mock.calls[0][0]
+    await trackNavigation(1, "https://a.com/", 0)
+    await listener(1, { windowId: 1, isWindowClosing: false })
+    expect(buffer()[0].domain).toBe("a.com")
   })
 })
 
 // ---------------------------------------------------------------------------
-// trackNavigation – first navigation to a previously unseen tab
+// Persistence across service worker restarts
 // ---------------------------------------------------------------------------
 
-describe("trackNavigation – first navigation to a tab", () => {
-  it("does not write to storage on the first navigation (no prior page to finalise)", async () => {
-    await trackNavigation(nextTabId, "https://example.com/", 1000)
-    expect(mockStorageSet).not.toHaveBeenCalled()
+describe("open visit state – chrome.storage.session", () => {
+  it("stores the open visit in chrome.storage.session, not in module memory", async () => {
+    await trackNavigation(1, "https://example.com/", 1000)
+    expect(sessionStore.activeVisit).toEqual({ tabId: 1, domain: "example.com", startedAt: 1000 })
+  })
+
+  it("finalises a visit that was opened before the service worker restarted", async () => {
+    // A fresh worker has nothing in memory; only session storage survives.
+    sessionStore.activeVisit = { tabId: 1, domain: "example.com", startedAt: 1000 }
+    await trackNavigation(1, "https://other.com/", 61_000)
+    expect(buffer()).toEqual([{ domain: "example.com", startedAt: 1000, duration: 60_000 }])
+  })
+
+  it("does not keep open visits in chrome.storage.local", async () => {
+    await trackNavigation(1, "https://example.com/", 1000)
+    expect(localStore.activeVisit).toBeUndefined()
   })
 })
 
 // ---------------------------------------------------------------------------
-// trackNavigation – buffer accumulation (acceptance criterion 2)
+// trackNavigation
 // ---------------------------------------------------------------------------
 
-describe("trackNavigation – buffer accumulation on subsequent navigation", () => {
-  it("writes to chrome.storage.local when a tab leaves a tracked page", async () => {
-    const tabId = nextTabId
-    await trackNavigation(tabId, "https://example.com/", 1000)
-    await trackNavigation(tabId, "https://another.com/", 1030)
-    expect(mockStorageSet).toHaveBeenCalled()
+describe("trackNavigation – first navigation", () => {
+  it("does not write to the buffer when no visit is open", async () => {
+    await trackNavigation(1, "https://example.com/", 1000)
+    expect(localArea.set).not.toHaveBeenCalled()
   })
+})
 
+describe("trackNavigation – buffer accumulation", () => {
   it("stores entries under the analyticsBuffer key", async () => {
-    const tabId = nextTabId
-    await trackNavigation(tabId, "https://example.com/", 1000)
-    await trackNavigation(tabId, "https://another.com/", 1030)
-    expect(mockStorageSet).toHaveBeenCalledWith(
+    await trackNavigation(1, "https://example.com/", 1000)
+    await trackNavigation(1, "https://another.com/", 1030)
+    expect(localArea.set).toHaveBeenCalledWith(
       expect.objectContaining({ analyticsBuffer: expect.any(Array) }),
     )
   })
 
   it("appends to the existing buffer rather than replacing it", async () => {
-    const tabId = nextTabId
-    const existing = [{ domain: "old.com", startedAt: 0, duration: 10 }]
-    mockStorageGet.mockResolvedValue({ analyticsBuffer: existing })
-    await trackNavigation(tabId, "https://a.com/", 1000)
-    mockStorageGet.mockResolvedValue({ analyticsBuffer: existing })
-    await trackNavigation(tabId, "https://b.com/", 1030)
-    const written = mockStorageSet.mock.calls[0][0].analyticsBuffer
-    expect(written.length).toBe(existing.length + 1)
+    localStore.analyticsBuffer = [{ domain: "old.com", startedAt: 0, duration: 10 }]
+    await trackNavigation(1, "https://a.com/", 1000)
+    await trackNavigation(1, "https://b.com/", 1030)
+    expect(buffer()).toHaveLength(2)
+    expect(buffer()[0].domain).toBe("old.com")
   })
 
-  it("initialises the buffer as an empty array when the storage key is absent", async () => {
-    const tabId = nextTabId
-    mockStorageGet.mockResolvedValue({})
-    await trackNavigation(tabId, "https://a.com/", 1000)
-    mockStorageGet.mockResolvedValue({})
-    await trackNavigation(tabId, "https://b.com/", 1030)
-    const written = mockStorageSet.mock.calls[0][0].analyticsBuffer
-    expect(Array.isArray(written)).toBe(true)
-    expect(written.length).toBe(1)
-  })
-})
-
-// ---------------------------------------------------------------------------
-// trackNavigation – entry content
-// ---------------------------------------------------------------------------
-
-describe("trackNavigation – entry domain", () => {
   it("stores the hostname only (not path or query string)", async () => {
-    const tabId = nextTabId
-    await trackNavigation(tabId, "https://example.com/path?q=1#frag", 1000)
-    await trackNavigation(tabId, "https://other.com/", 1060)
-    const written = mockStorageSet.mock.calls[0][0].analyticsBuffer
-    expect(written[written.length - 1].domain).toBe("example.com")
+    await trackNavigation(1, "https://example.com/path?q=1#frag", 1000)
+    await trackNavigation(1, "https://other.com/", 1060)
+    expect(buffer()[0].domain).toBe("example.com")
   })
 
-  it("does not write an entry for an unparseable or empty URL", async () => {
-    const tabId = nextTabId
-    await trackNavigation(tabId, "https://legit.com/", 1000)
-    await trackNavigation(tabId, "not-a-url", 1030)
-    expect(mockStorageSet).not.toHaveBeenCalled()
-  })
-})
-
-describe("trackNavigation – entry timestamps and duration", () => {
-  it("sets startedAt to the timestamp supplied at arrival time", async () => {
-    const tabId = nextTabId
-    await trackNavigation(tabId, "https://example.com/", 1000)
-    await trackNavigation(tabId, "https://other.com/", 1060)
-    const written = mockStorageSet.mock.calls[0][0].analyticsBuffer
-    expect(written[written.length - 1].startedAt).toBe(1000)
+  it("sets startedAt to arrival time and duration to time spent", async () => {
+    await trackNavigation(1, "https://example.com/", 1000)
+    await trackNavigation(1, "https://other.com/", 1060)
+    expect(buffer()[0]).toEqual({ domain: "example.com", startedAt: 1000, duration: 60 })
   })
 
-  it("sets duration to the difference between departure and arrival timestamps", async () => {
-    const tabId = nextTabId
-    await trackNavigation(tabId, "https://example.com/", 1000)
-    await trackNavigation(tabId, "https://other.com/", 1060)
-    const written = mockStorageSet.mock.calls[0][0].analyticsBuffer
-    expect(written[written.length - 1].duration).toBe(60)
+  it("starts timing the new page from the navigation timestamp", async () => {
+    await trackNavigation(1, "https://a.com/", 1000)
+    await trackNavigation(1, "https://b.com/", 1030)
+    await trackNavigation(1, "https://c.com/", 1100)
+    expect(buffer()[1]).toEqual({ domain: "b.com", startedAt: 1030, duration: 70 })
   })
 
-  it("tracks duration independently per tab ID", async () => {
-    const tabA = nextTabId
-    const tabB = nextTabId + 100
-    await trackNavigation(tabA, "https://a.com/", 1000)
-    await trackNavigation(tabB, "https://b.com/", 1010)
-    mockStorageGet.mockResolvedValue({ analyticsBuffer: [] })
-    // tabA leaves a.com after 50 seconds; tabB has not moved
-    await trackNavigation(tabA, "https://leave.com/", 1050)
-    const written = mockStorageSet.mock.calls[0][0].analyticsBuffer
-    const entry = written.find((e: { domain: string }) => e.domain === "a.com")
-    expect(entry?.duration).toBe(50)
+  it("closes the open visit when the tab navigates to an untrackable URL", async () => {
+    await trackNavigation(1, "https://legit.com/", 1000)
+    await trackNavigation(1, "not-a-url", 1030)
+    expect(buffer()).toEqual([{ domain: "legit.com", startedAt: 1000, duration: 30 }])
+    expect(sessionStore.activeVisit).toBeNull()
+  })
+
+  it("serialises overlapping events so no entry is lost", async () => {
+    await Promise.all([
+      trackNavigation(1, "https://a.com/", 1000),
+      trackNavigation(1, "https://b.com/", 1010),
+      trackNavigation(1, "https://c.com/", 1020),
+    ])
+    expect(buffer().map((e) => e.domain)).toEqual(["a.com", "b.com"])
   })
 })
 
 // ---------------------------------------------------------------------------
-// No network calls on navigation events (acceptance criterion 3)
+// trackActivation – tab switches
 // ---------------------------------------------------------------------------
 
-describe("trackNavigation – no immediate server network calls", () => {
-  it("never calls fetch during a single navigation event", async () => {
-    const tabId = nextTabId
-    await trackNavigation(tabId, "https://example.com/", 1000)
-    await trackNavigation(tabId, "https://another.com/", 1030)
-    expect(mockFetch).not.toHaveBeenCalled()
+describe("trackActivation – switching tabs", () => {
+  it("records the time spent on the previously active tab", async () => {
+    mockTabsGet.mockResolvedValue({ id: 2, url: "https://b.com/" })
+    await trackNavigation(1, "https://a.com/", 1000)
+    await trackActivation(2, 1050)
+    expect(buffer()).toEqual([{ domain: "a.com", startedAt: 1000, duration: 50 }])
   })
 
-  it("never calls fetch across many sequential navigation events", async () => {
-    const tabId = nextTabId
-    const sites = [
-      "https://a.com/",
-      "https://b.com/",
-      "https://c.com/",
-      "https://d.com/",
-      "https://e.com/",
-    ]
-    for (let i = 0; i < sites.length; i++) {
-      mockStorageGet.mockResolvedValue({ analyticsBuffer: [] })
-      await trackNavigation(tabId, sites[i], i * 1000)
-    }
+  it("opens a visit for the newly activated tab", async () => {
+    mockTabsGet.mockResolvedValue({ id: 2, url: "https://b.com/page" })
+    await trackActivation(2, 1050)
+    expect(sessionStore.activeVisit).toEqual({ tabId: 2, domain: "b.com", startedAt: 1050 })
+  })
+
+  it("does not count time in a background tab once the user switches away", async () => {
+    mockTabsGet.mockResolvedValueOnce({ id: 2, url: "https://b.com/" })
+    mockTabsGet.mockResolvedValueOnce({ id: 1, url: "https://a.com/" })
+    await trackNavigation(1, "https://a.com/", 1000)
+    await trackActivation(2, 1010)
+    await trackActivation(1, 5000)
+    await trackNavigation(1, "https://c.com/", 5020)
+    const aTime = buffer()
+      .filter((e) => e.domain === "a.com")
+      .reduce((sum, e) => sum + e.duration, 0)
+    expect(aTime).toBe(30)
+  })
+
+  it("leaves no open visit when the activated tab has no URL yet", async () => {
+    mockTabsGet.mockResolvedValue({ id: 2 })
+    await trackNavigation(1, "https://a.com/", 1000)
+    await trackActivation(2, 1050)
+    expect(buffer()).toHaveLength(1)
+    expect(sessionStore.activeVisit).toBeNull()
+  })
+
+  it("still records the previous visit if the activated tab cannot be read", async () => {
+    mockTabsGet.mockRejectedValue(new Error("No tab with id: 2"))
+    await trackNavigation(1, "https://a.com/", 1000)
+    await trackActivation(2, 1050)
+    expect(buffer()).toHaveLength(1)
+    expect(sessionStore.activeVisit).toBeNull()
+  })
+})
+
+// ---------------------------------------------------------------------------
+// trackTabClosed – tab closes
+// ---------------------------------------------------------------------------
+
+describe("trackTabClosed – closing tabs", () => {
+  it("records the visit when its tab is closed", async () => {
+    await trackNavigation(1, "https://a.com/", 1000)
+    await trackTabClosed(1, 1200)
+    expect(buffer()).toEqual([{ domain: "a.com", startedAt: 1000, duration: 200 }])
+    expect(sessionStore.activeVisit).toBeNull()
+  })
+
+  it("ignores closes of tabs other than the active one", async () => {
+    await trackNavigation(1, "https://a.com/", 1000)
+    await trackTabClosed(2, 1200)
+    expect(buffer()).toHaveLength(0)
+    expect(sessionStore.activeVisit).toMatchObject({ tabId: 1 })
+  })
+})
+
+// ---------------------------------------------------------------------------
+// No network calls
+// ---------------------------------------------------------------------------
+
+describe("tab tracking – no immediate server network calls", () => {
+  it("never calls fetch across navigation, activation and close events", async () => {
+    mockTabsGet.mockResolvedValue({ id: 2, url: "https://b.com/" })
+    await trackNavigation(1, "https://a.com/", 1000)
+    await trackActivation(2, 1030)
+    await trackTabClosed(2, 1060)
     expect(mockFetch).not.toHaveBeenCalled()
   })
 })

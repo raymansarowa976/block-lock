@@ -65,7 +65,9 @@ const PRISMA_RULES = [{
 }]
 
 function syncRequest() {
-  return new Request(`http://localhost/api/sync?token=${VALID_TOKEN}`)
+  return new Request("http://localhost/api/sync", {
+    headers: { Authorization: `Bearer ${VALID_TOKEN}` },
+  })
 }
 
 beforeEach(() => {

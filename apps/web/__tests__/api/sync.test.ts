@@ -87,12 +87,10 @@ const EXTENSION_ID = "ldlmnamnojhcjjnfoodglmcnaedagljl"
 const EXTENSION_ORIGIN = `chrome-extension://${EXTENSION_ID}`
 
 function syncRequest(token?: string, origin?: string) {
-  const url = token
-    ? `http://localhost/api/sync?token=${token}`
-    : "http://localhost/api/sync"
   const headers = new Headers()
+  if (token) headers.set("authorization", `Bearer ${token}`)
   if (origin) headers.set("origin", origin)
-  return new Request(url, { headers })
+  return new Request("http://localhost/api/sync", { headers })
 }
 
 beforeEach(() => {
@@ -108,9 +106,15 @@ describe("GET /api/sync", () => {
   // ── Missing / invalid token ─────────────────────────────────────────────────
 
   describe("missing token", () => {
-    it("returns 400 when token query param is absent", async () => {
+    it("returns 400 when the Authorization header is absent", async () => {
       const res = await GET(syncRequest())
       expect(res.status).toBe(400)
+    })
+
+    it("ignores a token sent in the query string", async () => {
+      const res = await GET(new Request(`http://localhost/api/sync?token=${VALID_TOKEN}`))
+      expect(res.status).toBe(400)
+      expect(mockVerify).not.toHaveBeenCalled()
     })
 
     it("does not touch Redis when token is missing", async () => {

@@ -33,6 +33,11 @@ describe("corsHeaders", () => {
     expect(headers?.["Access-Control-Allow-Origin"]).not.toBe("*")
   })
 
+  it("allows the Authorization header the extension sends its sync token in", () => {
+    const headers = corsHeaders(EXTENSION_ORIGIN)
+    expect(headers?.["Access-Control-Allow-Headers"]).toMatch(/\bAuthorization\b/)
+  })
+
   it("returns null for an unrelated chrome-extension origin", () => {
     const headers = corsHeaders("chrome-extension://some-other-extension-id")
     expect(headers).toBeNull()

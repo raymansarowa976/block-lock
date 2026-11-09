@@ -7,10 +7,13 @@ vi.mock("@/lib/redis", () => ({
 import { redis } from "@/lib/redis"
 import {
   mintSyncToken,
+  mintSyncRefreshToken,
   verifySyncToken,
+  verifySyncRefreshToken,
   revokeSyncTokensFor,
   decodeVerifiedPayload,
   SYNC_TOKEN_TTL_MS,
+  SYNC_REFRESH_TOKEN_TTL_MS,
 } from "@/lib/sync-token"
 
 const mockGet = redis.get as unknown as Mock
@@ -208,10 +211,10 @@ describe("revokeSyncTokensFor", () => {
     expect(cutoff).toBeLessThanOrEqual(after)
   })
 
-  it("sets a TTL matching the token lifetime, in seconds", async () => {
+  it("sets a TTL covering the longest-lived token (the refresh token), in seconds", async () => {
     await revokeSyncTokensFor(USER_ID)
     const [, , opts] = mockSet.mock.calls[0]
-    expect(opts.ex).toBe(Math.ceil(SYNC_TOKEN_TTL_MS / 1000))
+    expect(opts.ex).toBe(Math.ceil(SYNC_REFRESH_TOKEN_TTL_MS / 1000))
   })
 
   it("a token minted before revocation is rejected by verifySyncToken immediately after", async () => {
@@ -228,5 +231,93 @@ describe("revokeSyncTokensFor", () => {
     await revokeSyncTokensFor(USER_ID, now + 5)
     const result = await verifySyncToken(token, now + 10)
     expect(result).toBeNull()
+  })
+})
+
+// ---------------------------------------------------------------------------
+// Refresh tokens – the long-lived credential the extension uses to renew its
+// own access token once no dashboard tab is open to re-mint one for it
+// ---------------------------------------------------------------------------
+
+describe("mintSyncRefreshToken", () => {
+  it("lives much longer than an access token", () => {
+    expect(SYNC_REFRESH_TOKEN_TTL_MS).toBeGreaterThan(SYNC_TOKEN_TTL_MS)
+  })
+
+  it("returns a refresh token that expires TTL milliseconds in the future", () => {
+    const now = Date.now()
+    const { refreshToken, refreshExpiresAt } = mintSyncRefreshToken(USER_ID, now)
+    expect(refreshToken.length).toBeGreaterThan(0)
+    expect(refreshExpiresAt).toBe(now + SYNC_REFRESH_TOKEN_TTL_MS)
+  })
+})
+
+describe("verifySyncRefreshToken", () => {
+  it("recovers the userId from a freshly minted refresh token", async () => {
+    const { refreshToken } = mintSyncRefreshToken(USER_ID)
+    expect(await verifySyncRefreshToken(refreshToken)).toEqual({ userId: USER_ID })
+  })
+
+  it("stays valid long after an access token minted at the same time has expired", async () => {
+    const now = Date.now()
+    const { refreshToken } = mintSyncRefreshToken(USER_ID, now)
+    expect(await verifySyncRefreshToken(refreshToken, now + SYNC_TOKEN_TTL_MS + 1)).toEqual({
+      userId: USER_ID,
+    })
+  })
+
+  it("rejects a refresh token past its expiry", async () => {
+    const now = Date.now()
+    const { refreshToken, refreshExpiresAt } = mintSyncRefreshToken(USER_ID, now)
+    expect(await verifySyncRefreshToken(refreshToken, refreshExpiresAt)).toBeNull()
+  })
+
+  it("rejects an access token presented as a refresh token", async () => {
+    const { token } = mintSyncToken(USER_ID)
+    expect(await verifySyncRefreshToken(token)).toBeNull()
+  })
+
+  it("rejects a refresh token minted before the user's sign-out cutoff", async () => {
+    const now = Date.now()
+    const { refreshToken } = mintSyncRefreshToken(USER_ID, now)
+    mockGet.mockResolvedValue(now)
+    expect(await verifySyncRefreshToken(refreshToken, now + 1)).toBeNull()
+  })
+
+  it("rejects a tampered refresh token", async () => {
+    const { refreshToken } = mintSyncRefreshToken(USER_ID)
+    const [, signature] = refreshToken.split(".")
+    const tamperedPayload = Buffer.from(
+      JSON.stringify({ sub: "someone-else", iat: Date.now(), exp: Date.now() + 1000, typ: "refresh" }),
+    ).toString("base64url")
+    expect(await verifySyncRefreshToken(`${tamperedPayload}.${signature}`)).toBeNull()
+  })
+})
+
+describe("verifySyncToken – token type", () => {
+  it("rejects a refresh token presented as an access token", async () => {
+    // Otherwise the 30-day refresh token would itself be a 30-day credential
+    // for /api/sync and /api/analytics, defeating the short access TTL.
+    const { refreshToken } = mintSyncRefreshToken(USER_ID)
+    expect(await verifySyncToken(refreshToken)).toBeNull()
+  })
+
+  it("still accepts a legacy access token minted without a typ claim", async () => {
+    const now = Date.now()
+    const encodedPayload = Buffer.from(
+      JSON.stringify({ sub: USER_ID, iat: now, exp: now + SYNC_TOKEN_TTL_MS }),
+    ).toString("base64url")
+    const { createHmac } = await import("crypto")
+    const signature = createHmac("sha256", process.env.AUTH_SECRET!)
+      .update(encodedPayload)
+      .digest("base64url")
+    expect(await verifySyncToken(`${encodedPayload}.${signature}`)).toEqual({ userId: USER_ID })
+  })
+})
+
+describe("decodeVerifiedPayload – refresh tokens", () => {
+  it("recovers the userId from a refresh token, so the extension can revoke with it after its access token lapses", () => {
+    const { refreshToken } = mintSyncRefreshToken(USER_ID)
+    expect(decodeVerifiedPayload(refreshToken)).toEqual({ userId: USER_ID })
   })
 })

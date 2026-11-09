@@ -133,6 +133,47 @@ describe("ScheduleForm", () => {
     })
   })
 
+  it("rejects an end time equal to the start time without calling the action", async () => {
+    render(<ScheduleForm timeLimits={TIME_LIMITS} />)
+    await userEvent.type(screen.getByLabelText(/website/i), "example.com")
+    await selectTime("Start Time", "09:00")
+    await selectTime("End Time", "09:00")
+    await userEvent.click(screen.getByRole("button", { name: "Monday" }))
+    await userEvent.click(screen.getByRole("button", { name: /save/i }))
+    await waitFor(() => {
+      expect(screen.getByText(/end time must be different from the start time/i)).toBeInTheDocument()
+    })
+    expect(mockCreate).not.toHaveBeenCalled()
+  })
+
+  it("submits an overnight window that crosses midnight", async () => {
+    render(<ScheduleForm timeLimits={TIME_LIMITS} />)
+    await userEvent.type(screen.getByLabelText(/website/i), "example.com")
+    await selectTime("Start Time", "22:00")
+    await selectTime("End Time", "06:00")
+    await userEvent.click(screen.getByRole("button", { name: "Monday" }))
+    await userEvent.click(screen.getByRole("button", { name: /save/i }))
+    await waitFor(() => {
+      expect(mockCreate).toHaveBeenCalledWith(
+        expect.objectContaining({ startTime: "22:00", endTime: "06:00" }),
+      )
+    })
+  })
+
+  it("tells the user an overnight window ends the next day", async () => {
+    render(<ScheduleForm timeLimits={TIME_LIMITS} />)
+    await selectTime("Start Time", "22:00")
+    await selectTime("End Time", "06:00")
+    expect(screen.getByText(/ends the next day/i)).toBeInTheDocument()
+  })
+
+  it("does not show the next-day note for a same-day window", async () => {
+    render(<ScheduleForm timeLimits={TIME_LIMITS} />)
+    await selectTime("Start Time", "09:00")
+    await selectTime("End Time", "17:00")
+    expect(screen.queryByText(/ends the next day/i)).not.toBeInTheDocument()
+  })
+
   it("shows the server-provided error when the website is already blocked", async () => {
     mockCreate.mockResolvedValue({
       success: false,

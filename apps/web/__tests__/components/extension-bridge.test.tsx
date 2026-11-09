@@ -54,6 +54,7 @@ describe("ExtensionBridge", () => {
   const USER_ID = "clh3q5g0o0000qmij2z3m4n5k"
   const TOKEN = "signed.token"
   const EXPIRES_AT = 1_700_000_900_000
+  const REFRESH_TOKEN = "signed.refresh"
 
   it("fetches a sync token from the dashboard session on mount", async () => {
     stubChromeRuntime()
@@ -65,17 +66,23 @@ describe("ExtensionBridge", () => {
     await waitFor(() => expect(mockFetch).toHaveBeenCalledWith("/api/sync/token"))
   })
 
-  it("sends BLOCK_LOCK_AUTH with the fetched token and expiry, not a bare userId credential", async () => {
+  it("sends BLOCK_LOCK_AUTH with the fetched token, expiry and refresh token, not a bare userId credential", async () => {
     stubChromeRuntime()
     mockFetch.mockResolvedValue({
       ok: true,
-      json: async () => ({ token: TOKEN, expiresAt: EXPIRES_AT }),
+      json: async () => ({ token: TOKEN, expiresAt: EXPIRES_AT, refreshToken: REFRESH_TOKEN }),
     })
     render(<ExtensionBridge userId={USER_ID} />)
     await waitFor(() =>
       expect(mockSendMessage).toHaveBeenCalledWith(
         "test-extension-id",
-        { type: "BLOCK_LOCK_AUTH", userId: USER_ID, token: TOKEN, expiresAt: EXPIRES_AT },
+        {
+          type: "BLOCK_LOCK_AUTH",
+          userId: USER_ID,
+          token: TOKEN,
+          expiresAt: EXPIRES_AT,
+          refreshToken: REFRESH_TOKEN,
+        },
         expect.any(Function),
       ),
     )

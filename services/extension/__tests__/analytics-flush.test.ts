@@ -105,15 +105,51 @@ describe("flushAnalytics – locally expired token", () => {
       userId: null,
       token: null,
       tokenExpiresAt: null,
+      refreshToken: null,
     })
+  })
+})
+
+describe("flushAnalytics – renewing an expired access token", () => {
+  const expiredWithRefresh = {
+    token: "old.tok",
+    tokenExpiresAt: Date.now() - 1,
+    refreshToken: "signed.refresh",
+    analyticsBuffer: BUFFER,
+  }
+
+  it("renews the token with the refresh token and flushes with the new one", async () => {
+    mockStorageGet.mockResolvedValue(expiredWithRefresh)
+    mockFetch.mockImplementation(async (url: string) =>
+      url.includes("/sync/refresh")
+        ? { ok: true, status: 200, json: async () => ({ token: "new.tok", expiresAt: 1, refreshToken: "r2" }) }
+        : { ok: true, status: 201 },
+    )
+    await flushAnalytics()
+    expect(mockFetch).toHaveBeenCalledWith(
+      expect.stringMatching(/\/api\/analytics$/),
+      expect.objectContaining({
+        method: "POST",
+        headers: expect.objectContaining({ Authorization: "Bearer new.tok" }),
+      }),
+    )
+    expect(mockStorageSet).toHaveBeenCalledWith({ analyticsBuffer: [] })
+  })
+
+  it("leaves the buffer and credential intact when the refresh call can't reach the server", async () => {
+    mockStorageGet.mockResolvedValue(expiredWithRefresh)
+    mockFetch.mockRejectedValue(new TypeError("Failed to fetch"))
+    await flushAnalytics()
+    expect(mockFetch).toHaveBeenCalledTimes(1)
+    expect(mockStorageSet).not.toHaveBeenCalled()
   })
 })
 
 // ---------------------------------------------------------------------------
 // flushAnalytics – HTTP request shape (acceptance criterion: /api/analytics
-// now uses the same signed-token scheme as /api/sync — the token rides along
-// as a query param since a chrome-extension:// service-worker fetch is
-// cross-site and never carries the dashboard's session cookie)
+// now uses the same signed-token scheme as /api/sync — the token is sent as
+// an Authorization: Bearer header since a chrome-extension:// service-worker
+// fetch is cross-site and never carries the dashboard's session cookie)
 // ---------------------------------------------------------------------------
 
 describe("flushAnalytics – POST request to /api/analytics", () => {
@@ -132,10 +168,17 @@ describe("flushAnalytics – POST request to /api/analytics", () => {
     expect(opts.method).toBe("POST")
   })
 
-  it("targets a URL that includes /api/analytics with the signed token as a query param", async () => {
+  it("targets /api/analytics without the token in the URL", async () => {
     await flushAnalytics()
     const [url] = mockFetch.mock.calls[0]
-    expect(url).toContain("/api/analytics?token=signed.tok")
+    expect(url).toMatch(/\/api\/analytics$/)
+    expect(url).not.toContain("token=")
+  })
+
+  it("sends the signed token in an Authorization: Bearer header", async () => {
+    await flushAnalytics()
+    const [, opts] = mockFetch.mock.calls[0]
+    expect(opts.headers.Authorization).toBe("Bearer signed.tok")
   })
 
   it("sets Content-Type to application/json", async () => {
@@ -221,6 +264,7 @@ describe("flushAnalytics – server rejects the token", () => {
       userId: null,
       token: null,
       tokenExpiresAt: null,
+      refreshToken: null,
     })
   })
 
@@ -232,6 +276,7 @@ describe("flushAnalytics – server rejects the token", () => {
       userId: null,
       token: null,
       tokenExpiresAt: null,
+      refreshToken: null,
     })
   })
 

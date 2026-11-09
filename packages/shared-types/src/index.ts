@@ -10,6 +10,23 @@ const HHMMTime = z
 
 const DayOfWeek = z.number().int().min(0).max(6)
 
+// A schedule window whose end is earlier than its start (e.g. 22:00–06:00)
+// crosses midnight and is supported. One whose end equals its start is
+// ambiguous (empty, or a full 24 hours?), so it's rejected. Only checked
+// when both times are present, so partial updates touching one time pass.
+function startDiffersFromEnd(
+  value: { startTime?: string; endTime?: string },
+  ctx: z.RefinementCtx,
+) {
+  if (value.startTime !== undefined && value.startTime === value.endTime) {
+    ctx.addIssue({
+      code: z.ZodIssueCode.custom,
+      path: ["endTime"],
+      message: "End time must be different from the start time",
+    })
+  }
+}
+
 // Canonical host: lowercase ASCII labels, IDNs as punycode (incl. xn-- TLDs).
 // The alphabetic/punycode TLD requirement also rules out IPv4 literals.
 const CANONICAL_HOST =
@@ -92,26 +109,31 @@ export const CreateTimeLimitSchema = z.object({
 
 export const UpdateTimeLimitSchema = CreateTimeLimitSchema.partial()
 
-export const CreateScheduleSchema = z.object({
+const CreateScheduleBase = z.object({
   timeLimitId: z.string().cuid(),
   startTime: HHMMTime,
   endTime: HHMMTime,
   daysOfWeek: z.array(DayOfWeek).min(1, "At least one day required"),
 })
 
-export const UpdateScheduleSchema = CreateScheduleSchema
+export const CreateScheduleSchema = CreateScheduleBase.superRefine(startDiffersFromEnd)
+
+export const UpdateScheduleSchema = CreateScheduleBase
   .omit({ timeLimitId: true })
   .partial()
+  .superRefine(startDiffersFromEnd)
 
 // Creates a schedule by domain rather than timeLimitId — used when the
 // caller doesn't yet know (or care) whether a TimeLimit exists for the
 // domain; the server resolves or creates the parent TimeLimit itself.
-export const CreateScheduleForDomainSchema = z.object({
-  domain: Domain,
-  startTime: HHMMTime,
-  endTime: HHMMTime,
-  daysOfWeek: z.array(DayOfWeek).min(1, "At least one day required"),
-})
+export const CreateScheduleForDomainSchema = z
+  .object({
+    domain: Domain,
+    startTime: HHMMTime,
+    endTime: HHMMTime,
+    daysOfWeek: z.array(DayOfWeek).min(1, "At least one day required"),
+  })
+  .superRefine(startDiffersFromEnd)
 
 // ---------------------------------------------------------------------------
 // AI structured-output schemas — natural language → relational block records
@@ -120,12 +142,14 @@ export const CreateScheduleForDomainSchema = z.object({
 // One block record: a domain paired with the time window/days to block it.
 // Mirrors TimeLimit (domain) + Schedule (startTime/endTime/daysOfWeek) so the
 // API layer can create both rows directly from a single parsed record.
-export const AIScheduleBlockSchema = z.object({
-  domain: Domain,
-  startTime: HHMMTime,
-  endTime: HHMMTime,
-  daysOfWeek: z.array(DayOfWeek).min(1, "At least one day required"),
-})
+export const AIScheduleBlockSchema = z
+  .object({
+    domain: Domain,
+    startTime: HHMMTime,
+    endTime: HHMMTime,
+    daysOfWeek: z.array(DayOfWeek).min(1, "At least one day required"),
+  })
+  .superRefine(startDiffersFromEnd)
 
 export const AIScheduleParseResultSchema = z.object({
   blocks: z.array(AIScheduleBlockSchema).min(1, "At least one block required"),

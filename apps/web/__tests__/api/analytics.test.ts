@@ -36,11 +36,9 @@ const VALID_ENTRIES = [
 function jsonRequest(body: unknown, options: { token?: string; origin?: string } = {}) {
   const { token, origin } = options
   const headers = new Headers({ "Content-Type": "application/json" })
+  if (token) headers.set("authorization", `Bearer ${token}`)
   if (origin) headers.set("origin", origin)
-  const url = token
-    ? `http://localhost/api/analytics?token=${token}`
-    : "http://localhost/api/analytics"
-  return new Request(url, {
+  return new Request("http://localhost/api/analytics", {
     method: "POST",
     headers,
     body: JSON.stringify(body),
@@ -64,9 +62,21 @@ beforeEach(() => {
 // ---------------------------------------------------------------------------
 
 describe("POST /api/analytics – authentication", () => {
-  it("returns 400 when the token query param is absent", async () => {
+  it("returns 400 when the Authorization header is absent", async () => {
     const res = await POST(jsonRequest({ entries: VALID_ENTRIES }))
     expect(res.status).toBe(400)
+  })
+
+  it("ignores a token sent in the query string", async () => {
+    const res = await POST(
+      new Request(`http://localhost/api/analytics?token=${VALID_TOKEN}`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ entries: VALID_ENTRIES }),
+      }),
+    )
+    expect(res.status).toBe(400)
+    expect(mockCreateMany).not.toHaveBeenCalled()
   })
 
   it("does not touch the database when the token is missing", async () => {
@@ -210,9 +220,9 @@ describe("POST /api/analytics – Zod schema validation", () => {
   })
 
   it("returns 400 for malformed JSON body", async () => {
-    const req = new Request(`http://localhost/api/analytics?token=${VALID_TOKEN}`, {
+    const req = new Request("http://localhost/api/analytics", {
       method: "POST",
-      headers: { "Content-Type": "application/json" },
+      headers: { "Content-Type": "application/json", Authorization: `Bearer ${VALID_TOKEN}` },
       body: "{ invalid json",
     })
     const res = await POST(req)
