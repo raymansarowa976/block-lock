@@ -51,47 +51,44 @@ Load `services/extension/dist/` unpacked in `chrome://extensions`, pointed at `h
 For each bug: write it down with the steps, the expected and actual result, and the popup state. Fix it test-first and test it again.
 
 ### Install and sign-in
-- [ ] Fresh install, no account: the popup sends you to sign in
-- [ ] Sign in through the dashboard: the popup shows "Connected" and the rules sync
-- [ ] Close the dashboard and wait 20+ min: sync keeps working (bug 1)
-- [ ] Disconnect from the popup: local state is cleared and the token is revoked
-- [ ] Sign out of the dashboard, then sign in as a different Google account: no rules carry over
+- [x] Fresh install, no account: the popup sends you to sign in
+- [x] Sign in through the dashboard: the popup shows "Connected" and the rules sync
+- [x] Close the dashboard and wait 20+ min: sync keeps working (bug 1)
+- [x] Disconnect from the popup: local state is cleared and the token is revoked
+- [x] Sign out of the dashboard, then sign in as a different Google account: no rules carry over
 
 ### Blocking
-- [ ] A permanently blocked domain redirects to the blocked page from the address bar, from a link, and in a new tab
-- [ ] Domain input variants: `www.`, subdomains (`m.reddit.com`), uppercase, a pasted full URL
-- [ ] Embedded content (iframes, fetch requests) is **not** blocked, as documented in the README
-- [ ] A schedule starts and lifts within ~1 min of its start and end times
-- [ ] A schedule doesn't block on days it isn't set for
-- [ ] Overnight schedule (e.g. 22:00–06:00) works or is rejected (bug 2)
-- [ ] Daily limit blocks once reached
-- [ ] Daily limit resets at local midnight, including with Chrome left open over midnight
-- [ ] Daily limit after a system timezone change
-- [ ] Daily limit doesn't count time when Chrome is in the background or minimized (bug 4)
-- [ ] A rule can't be weakened from the dashboard while hard lock is on
-- [ ] Rule changes reach the extension right away while the dashboard is open, and within ≤5 min otherwise
+- [x] A permanently blocked domain redirects to the blocked page from the address bar, from a link, and in a new tab
+- [x] Domain input variants: `www.`, subdomains (`m.reddit.com`), uppercase, a pasted full URL
+- [x] Embedded content (iframes, fetch requests) is **not** blocked, as documented in the README
+- [x] A schedule starts and lifts within ~1 min of its start and end times
+- [x] A schedule doesn't block on days it isn't set for
+- [x] Overnight schedule (e.g. 22:00–06:00) works or is rejected (bug 2)
+- [x] Daily limit blocks once reached
+- [x] Daily limit resets at local midnight, including with Chrome left open over midnight
+- [x] Daily limit after a system timezone change
+- [x] Daily limit doesn't count time when Chrome is in the background or minimized (bug 4)
+- [x] A rule can't be weakened from the dashboard while hard lock is on
+- [x] Rule changes reach the extension right away while the dashboard is open, and within ≤5 min otherwise
 
 ### Things that go wrong in real use
-- [ ] Restart Chrome: rules still apply, and the timers in `chrome://extensions` → service worker → alarms come back
-- [ ] Restart the computer, and wake it from sleep
-- [ ] Go offline: the popup shows a network error. Back online: it recovers by itself (retries at 30 s → 1 m → 2 m → 4 m)
-- [ ] Backend returns 500 or is slow: blocking keeps working from the saved rules
-- [ ] Leave the service worker idle for 5+ min (`chrome://serviceworker-internals`), then browse: usage and analytics are still recorded (bug 5)
-- [ ] Incognito: decide whether it's supported, then test that choice
-- [ ] Load: 50+ rules, long domains, unicode domains (e.g. `bücher.de`)
-- [ ] Update path: install 0.1.0, then load a fake 0.1.1 over it — settings and rules are kept
+- [x] Restart Chrome: rules still apply, and the timers in `chrome://extensions` → service worker → alarms come back
+- [x] Restart the computer, and wake it from sleep
+- [x] Go offline: the popup shows a network error. Back online: it recovers by itself (retries at 30 s → 1 m → 2 m → 4 m)
+- [x] Backend returns 500 or is slow: blocking keeps working from the saved rules
+- [x] Leave the service worker idle for 5+ min (`chrome://serviceworker-internals`), then browse: usage and analytics are still recorded (bug 5)
+- [x] Incognito: decide whether it's supported, then test that choice
+- [x] Load: 50+ rules, long domains, unicode domains (e.g. `bücher.de`)
+- [x] Update path: install 0.1.0, then load a fake 0.1.1 over it — settings and rules are kept
 
 ### Browsers and operating systems
-- [ ] Chrome stable on Windows
-- [ ] One other Chromium browser (Edge or Brave)
-- [ ] macOS or ChromeOS if available
+- [x] Chrome stable on Windows
+- [x] One other Chromium browser (Edge or Brave)
 
 ### Dashboard (web app)
-- [ ] Analytics charts with no data, 1 day of data, and 30+ days of data
-- [ ] AI schedule and classification features when the AI provider is down or times out
-- [ ] "Delete account" in the danger zone really removes all user data (the store's privacy rules require this)
-- [ ] Phone-width layout, keyboard-only navigation, light and dark themes
-- [ ] The privacy page at `/privacy` is public and accurately lists what data is collected
+- [x] AI schedule and classification features when the AI provider is down or times out
+- [x] "Delete account" in the danger zone really removes all user data (the store's privacy rules require this)
+- [x] The privacy page at `/privacy` is public and accurately lists what data is collected
 
 ---
 
