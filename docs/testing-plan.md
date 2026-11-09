@@ -107,8 +107,8 @@ For each bug: write it down with the steps, the expected and actual result, and 
 ## Phase 4: Final check and submit (Nov 13)
 
 ### Release steps (from `services/extension/RELEASING.md`)
-- [ ] **Merge `dev` into `main` first.** `main` is behind `dev` and doesn't have the sync retry and popup sync changes
-- [ ] RELEASING.md says to branch from `main`. Make sure that matches your real flow, or update the doc
+- [x] **Merge `dev` into `main` first.** `main` is behind `dev` and doesn't have the sync retry and popup sync changes
+- [x] RELEASING.md says to branch from `main`. Make sure that matches your real flow, or update the doc
 - [ ] Update the date of the `## [0.1.0]` entry in `CHANGELOG.md` to the submission date
 - [ ] `pnpm --filter @block-lock/extension test` and `test:e2e`
 - [ ] `pnpm --filter @block-lock/extension build` → `dist/block-lock-extension-0.1.0.zip`
