@@ -53,7 +53,7 @@ jobs:
         run: pnpm install --frozen-lockfile
 
       # Builds @block-lock/shared-types first (turbo ^build), then the
-      # extension into services/extension/dist, which the specs load.
+      # extension store build into services/extension/dist-store, which the specs load.
       - name: Build extension
         run: pnpm turbo build --filter=@block-lock/extension
 
