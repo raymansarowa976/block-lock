@@ -1,9 +1,12 @@
 import { test as base, chromium } from "@playwright/test";
+import path from "path";
 import type { BrowserContext, Worker } from "@playwright/test";
-import { STORE_OUT_DIR } from "../scripts/build-paths.mjs";
 
 // The specs test the store build (`pnpm build`), the same one that ships.
-const EXTENSION_PATH = STORE_OUT_DIR;
+// Must match STORE_OUT_DIR in scripts/build-paths.mjs (build-paths.test.ts
+// checks this). It isn't imported because Playwright compiles this file to
+// CommonJS, which can't load the .mjs in CI.
+const EXTENSION_PATH = path.join(__dirname, "../dist-store");
 
 type WorkerFixtures = {
   extensionContext: BrowserContext;
