@@ -116,17 +116,19 @@ The dashboard is now at [http://localhost:3000](http://localhost:3000).
 ### 5. Build and load the Chrome extension
 
 ```bash
-pnpm --filter extension build
+pnpm --filter extension dev
 ```
 
-This produces a `services/extension/dist/` folder. Load it into Chrome:
+This builds a development version into `services/extension/dist/` and rebuilds it whenever you save. Only this build connects to the dashboard on `http://localhost:3000`. Load it into Chrome:
 
 1. Go to `chrome://extensions`
 2. Enable **Developer mode** (top-right toggle)
 3. Click **Load unpacked** and select `services/extension/dist/`
 4. Note the extension ID shown on the card — you'll need it if you add `NEXT_PUBLIC_EXTENSION_ID` to the env file
 
-Sign in to the dashboard and the extension will automatically sync your blocking rules.
+Sign in to the dashboard and the extension will automatically sync your blocking rules. After a rebuild, click the reload icon on the extension's card in `chrome://extensions`.
+
+`pnpm --filter extension build` makes the Chrome Web Store version instead, in `services/extension/dist-store/`. That version only connects to `https://blocklock.app`, so it won't sync with a local dashboard.
 
 To ship an extension update to the Chrome Web Store, follow [services/extension/RELEASING.md](services/extension/RELEASING.md).
 
