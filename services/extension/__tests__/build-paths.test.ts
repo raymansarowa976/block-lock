@@ -1,5 +1,6 @@
 // @vitest-environment node
 import { describe, it, expect } from "vitest"
+import fs from "node:fs"
 import path from "node:path"
 import { fileURLToPath } from "node:url"
 import { DEV_OUT_DIR, STORE_OUT_DIR, outDirForMode } from "../scripts/build-paths.mjs"
@@ -37,5 +38,20 @@ describe("build output folders", () => {
 
   it("keeps the dev build at dist/, where the README says to load it", () => {
     expect(path.basename(DEV_OUT_DIR)).toBe("dist")
+  })
+})
+
+// Playwright compiles test files to CommonJS, which breaks on .mjs imports
+// in CI ("exports is not defined in ES module scope"). So the E2E setup
+// spells out the store folder itself, and this keeps the two in step.
+describe("E2E setup", () => {
+  const fixtures = fs.readFileSync(path.join(EXTENSION_ROOT, "e2e/fixtures.ts"), "utf-8")
+
+  it("does not import any .mjs module", () => {
+    expect(fixtures).not.toMatch(/from\s+["'][^"']+\.mjs["']/)
+  })
+
+  it("loads the store build folder", () => {
+    expect(fixtures).toContain(`path.join(__dirname, "../${path.basename(STORE_OUT_DIR)}")`)
   })
 })
