@@ -3,12 +3,13 @@ import fs from "node:fs"
 import path from "node:path"
 import { fileURLToPath } from "node:url"
 import { findReleaseProblems } from "./release-lib.mjs"
+import { STORE_OUT_DIR } from "./build-paths.mjs"
 
 const require = createRequire(import.meta.url)
 const AdmZip = require("adm-zip")
 
 const __dirname = fileURLToPath(new URL(".", import.meta.url))
-const DIST = path.join(__dirname, "../dist")
+const DIST = STORE_OUT_DIR
 const manifest = JSON.parse(fs.readFileSync(path.join(DIST, "manifest.json"), "utf-8"))
 const pkg = JSON.parse(fs.readFileSync(path.join(__dirname, "../package.json"), "utf-8"))
 const changelog = fs.readFileSync(path.join(__dirname, "../CHANGELOG.md"), "utf-8")

@@ -1,8 +1,9 @@
 import { test as base, chromium } from "@playwright/test";
-import path from "path";
 import type { BrowserContext, Worker } from "@playwright/test";
+import { STORE_OUT_DIR } from "../scripts/build-paths.mjs";
 
-const EXTENSION_PATH = path.join(__dirname, "../dist");
+// The specs test the store build (`pnpm build`), the same one that ships.
+const EXTENSION_PATH = STORE_OUT_DIR;
 
 type WorkerFixtures = {
   extensionContext: BrowserContext;
