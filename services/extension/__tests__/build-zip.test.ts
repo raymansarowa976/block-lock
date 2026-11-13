@@ -4,13 +4,13 @@ import fs from "node:fs"
 import path from "node:path"
 import { fileURLToPath } from "node:url"
 import AdmZip from "adm-zip"
+import { STORE_OUT_DIR } from "../scripts/build-paths.mjs"
 
 const __dirname = fileURLToPath(new URL(".", import.meta.url))
-const DIST = path.join(__dirname, "../dist")
 const manifest = JSON.parse(
   fs.readFileSync(path.join(__dirname, "../manifest.json"), "utf-8"),
 )
-const EXPECTED_ZIP = path.join(DIST, `block-lock-extension-${manifest.version}.zip`)
+const EXPECTED_ZIP = path.join(STORE_OUT_DIR, `block-lock-extension-${manifest.version}.zip`)
 
 const REQUIRED_ENTRIES = [
   "manifest.json",
@@ -23,7 +23,7 @@ const REQUIRED_ENTRIES = [
 ]
 
 describe("extension production zip archive", () => {
-  it("dist/ contains a versioned zip matching the manifest version", () => {
+  it("the store build folder contains a versioned zip matching the manifest version", () => {
     expect(fs.existsSync(EXPECTED_ZIP)).toBe(true)
   })
 

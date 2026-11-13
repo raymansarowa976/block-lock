@@ -18,6 +18,9 @@ These three files are checked against each other in two places:
   Chrome accepts, or if `CHANGELOG.md` has no entry for it.
 - **At packaging time:** `pnpm build` (via `scripts/zip-dist.mjs`) refuses to create the store zip for the same reasons.
 
+`pnpm build` writes the store build to `dist-store/`, not `dist/`. `dist/` belongs to `pnpm dev`, the
+build you load in Chrome for local work, so packaging a release never replaces it.
+
 ## Day to day: keep `[Unreleased]` current
 
 Any PR that changes what ships in the extension (code under `src/`, `manifest.json`, `popup.html`,
@@ -58,11 +61,11 @@ the changelog and update the permission justifications in the store dashboard.
 3. **Check the release:**
    ```bash
    pnpm --filter extension test
-   pnpm --filter extension test:e2e
-   pnpm --filter extension build            # creates dist/block-lock-extension-X.Y.Z.zip
+   pnpm --filter extension build            # creates dist-store/block-lock-extension-X.Y.Z.zip
    pnpm --filter extension test:artifacts   # checks the zip's contents
+   pnpm --filter extension test:e2e         # loads the build in dist-store/
    ```
-   Load `services/extension/dist/` unpacked in `chrome://extensions` and smoke-test sign-in, rule
+   Load `services/extension/dist-store/` unpacked in `chrome://extensions` and smoke-test sign-in, rule
    sync, a scheduled block, a daily limit, and the popup.
 4. **Open a PR** titled `release: extension vX.Y.Z` and paste the changelog entry into the description.
    Merge it once CI passes.
@@ -77,7 +80,7 @@ the changelog and update the permission justifications in the store dashboard.
    git switch --detach extension-vX.Y.Z
    pnpm --filter extension build
    ```
-   Upload `services/extension/dist/block-lock-extension-X.Y.Z.zip` in the Chrome Web Store developer
+   Upload `services/extension/dist-store/block-lock-extension-X.Y.Z.zip` in the Chrome Web Store developer
    dashboard → **Package** → **Upload new package**.
 7. **Update the listing if needed.** Do this if permissions, data collection or features changed:
    update the description, the **Privacy practices** tab and the privacy policy (`apps/web/app/privacy`).

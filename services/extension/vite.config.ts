@@ -4,6 +4,7 @@ import tailwindcss from "@tailwindcss/vite"
 import { resolve } from "path"
 import { cpSync, readFileSync, writeFileSync } from "fs"
 import { manifestForMode } from "./scripts/manifest-for-mode.mjs"
+import { outDirForMode } from "./scripts/build-paths.mjs"
 
 export default defineConfig(({ mode }) => ({
   envPrefix: ["VITE_", "NEXT_PUBLIC_"],
@@ -15,17 +16,18 @@ export default defineConfig(({ mode }) => ({
       closeBundle() {
         const manifest = JSON.parse(readFileSync(resolve(__dirname, "manifest.json"), "utf-8"))
         writeFileSync(
-          resolve(__dirname, "dist/manifest.json"),
+          resolve(outDirForMode(mode), "manifest.json"),
           JSON.stringify(manifestForMode(manifest, mode), null, 2) + "\n",
         )
-        cpSync(resolve(__dirname, "icons"), resolve(__dirname, "dist/icons"), {
+        cpSync(resolve(__dirname, "icons"), resolve(outDirForMode(mode), "icons"), {
           recursive: true,
         })
       },
     },
   ],
   build: {
-    outDir: "dist",
+    // Store builds go to dist-store/, dev builds to dist/ (see build-paths.mjs).
+    outDir: outDirForMode(mode),
     emptyOutDir: true,
     rollupOptions: {
       input: {
@@ -34,8 +36,8 @@ export default defineConfig(({ mode }) => ({
         background: resolve(__dirname, "src/background.ts"),
       },
       output: {
-        // background entry goes to dist/src/background.js to match the
-        // manifest's service_worker path when dist/ is loaded as an extension
+        // background entry goes to <outDir>/src/background.js to match the
+        // manifest's service_worker path when the folder is loaded as an extension
         entryFileNames: (chunk) =>
           chunk.name === "background" ? "src/[name].js" : "assets/[name]-[hash].js",
         chunkFileNames: "assets/[name]-[hash].js",
