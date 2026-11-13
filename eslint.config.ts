@@ -21,6 +21,7 @@ export default defineConfig([
     ignores: [
       "**/node_modules/**",
       "**/dist/**",
+      "**/dist-store/**",
       "**/.next/**",
       "**/out/**",
       "**/build/**",
