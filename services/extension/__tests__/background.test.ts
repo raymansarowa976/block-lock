@@ -57,15 +57,10 @@ function fire(evt: { listeners: Listener[] }) {
   for (const fn of evt.listeners) fn()
 }
 
-// src/background.js is a committed placeholder that Vite resolves ahead of
-// background.ts, so the .ts extension is explicit. Held in a variable because
-// tsc rejects literal .ts import paths.
-const BACKGROUND_MODULE = "../src/background.ts"
-
 let tabListenerCallsOnLoad = 0
 
 beforeAll(async () => {
-  await import(BACKGROUND_MODULE)
+  await import("../src/background")
   tabListenerCallsOnLoad = vi.mocked(registerTabListeners).mock.calls.length
 })
 
