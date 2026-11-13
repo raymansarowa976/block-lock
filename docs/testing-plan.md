@@ -92,45 +92,53 @@ For each bug: write it down with the steps, the expected and actual result, and 
 
 ---
 
-## Phase 3: Private beta (Nov 9–12)
+## Phase 3: Private beta (Nov 13–25)
 
-- [ ] Upload the build as a **Private** or **Unlisted** listing in the Chrome Web Store dashboard
-- [ ] Note the store-assigned extension ID and set `NEXT_PUBLIC_EXTENSION_ID` in Vercel production. Redeploy (bug 7)
-- [ ] Install from the store and confirm sign-in works with the real ID
-- [ ] Invite 3–5 trusted testers. Ask them to send bug reports with the time, popup state and steps
-- [ ] Use it daily yourself
+### Upload and connect: Fri Nov 13 (review ~Nov 14–18)
+- [ ] Upload the build as a **Private** listing (named testers only) or an **Unlisted** listing (anyone with the link) in the Chrome Web Store dashboard. Both go through review, so allow a few days
+- [ ] Fill in the store listing, privacy practices and permission explanations from Phase 4 now. Review needs them
+- [ ] Note the store-assigned extension ID and set `NEXT_PUBLIC_EXTENSION_ID` in Vercel production. **Redeploy**. `NEXT_PUBLIC_*` values are baked in at build time, so changing the variable alone does nothing (bug 7)
+  - A wrong ID fails silently: the dashboard sends the sign-in token to the wrong extension and the popup stays "Not Connected"
+  - Optional: copy the public key from the dashboard's **Package** tab into `manifest.json` as `"key"`, so local unpacked builds get the same ID
+- [ ] If Google sign-in is still in **Testing** mode, add each beta tester as a test user in Google Cloud Console
+
+### Test and use it: once approved (~Nov 18–25)
+- [ ] In a **fresh Chrome profile** with no unpacked Block Lock, install from the store and confirm:
+  - Popup says "Not Connected" → sign in at blocklock.app → popup says "Connected" with a "Last synced" time
+  - Adding a rule on the dashboard blocks the site within seconds
+  - Usage shows up on the analytics page
+- [ ] Use it daily yourself for about a week
 - [ ] Fix only crashes and blockers. Anything else goes under `## [Unreleased]` for 0.1.1
-- [ ] Run the whole Phase 2 checklist again on the final build
+- [ ] Run the whole Phase 2 checklist again on the final build (~Nov 25)
 
 ---
 
-## Phase 4: Final check and submit (Nov 13)
+## Phase 4: Final check and submit (Thu Nov 26)
 
-### Release steps (from `services/extension/RELEASING.md`)
+### Release steps
 - [x] **Merge `dev` into `main` first.** `main` is behind `dev` and doesn't have the sync retry and popup sync changes
 - [x] RELEASING.md says to branch from `main`. Make sure that matches your real flow, or update the doc
-- [ ] Update the date of the `## [0.1.0]` entry in `CHANGELOG.md` to the submission date
-- [ ] `pnpm --filter @block-lock/extension test` and `test:e2e`
-- [ ] `pnpm --filter @block-lock/extension build` → `dist/block-lock-extension-0.1.0.zip`
-- [ ] `pnpm --filter @block-lock/extension test:artifacts`
-- [ ] Tag `extension-v0.1.0` and push the tag
-- [ ] Build from the tag and upload the zip
+- [ ] **No changes during the beta:** keep 0.1.0. Switch **Distribution → Visibility** to **Public** and submit for review. No new upload is needed
+- [ ] **Fixed something during the beta:** 0.1.0 is already published (privately), so ship **0.1.1**:
+  - `pnpm --filter extension release patch`. This moves `[Unreleased]` into a dated `[0.1.1]` entry
+  - Run the tests, `build` and `test:artifacts` again, then tag `extension-v0.1.1`, build from the tag and upload the zip
+  - Switch visibility to **Public** and submit
 
 ### Store listing
 - [ ] **Single purpose:** "Blocks distracting sites on user-defined schedules and daily time limits."
 - [ ] **Permission explanations:**
-  - `declarativeNetRequest`: blocks and redirects the sites the user chose to block
-  - `storage`: stores synced rules and daily usage on the device
-  - `alarms`: re-checks schedule windows and daily limits every minute, and syncs rules every 5 min
-  - `<all_urls>` (expect the closest look at this one): reads the active tab's domain to measure daily limits, and redirects any site the user blocks to the blocked page
-- [ ] **Privacy practices:** say that you collect **web history / user activity** (domains visited and time on site, sent to the Block Lock server). Confirm you don't sell or transfer the data. Certify Limited Use compliance
+  - `declarativeNetRequest`: blocks the sites the user chose and redirects them to Block Lock's blocked page
+  - `storage`: stores synced rules, the sign-in credential and daily usage on the device
+  - `alarms`: re-checks schedule windows and daily limits every minute, syncs rules every 5 min (with quick retries after a failed sync), and uploads usage every 5 min
+  - `idle`: checks whether the screen is locked so daily limits don't count time while the user is away. The lock state is never stored or sent anywhere
+  - `<all_urls>` (expect the closest look at this one): reads the active tab's address to measure time per site for daily limits, redirects any site the user blocks to the blocked page, and lets the extension reach the Block Lock API
+- [ ] **Privacy practices:** say that you collect **web history** (domains visited and time on site, sent to the Block Lock server). Confirm you don't sell or transfer the data. Certify Limited Use compliance
 - [ ] **Privacy policy URL:** `https://blocklock.app/privacy`
 - [ ] **Assets:** 128×128 icon, at least one 1280×800 screenshot (popup, blocked page, dashboard), 440×280 small promo tile
 - [ ] **Description:** covers only what the extension itself does. AI features belong to the web app (per RELEASING.md)
 - [ ] Submit for review
 
-### After submitting
-- Plan for one possible rejection. If rejected, fix it and upload again with the **same** version (0.1.0 was never published)
-- Once approved: create a GitHub release from the `extension-v0.1.0` tag, using the changelog entry as its notes
-- Watch the first few days of real users for sync errors and sign-in failures
-- Ship bugs 4–6 (if deferred) in **0.1.1**
+### After submitting (review ~Nov 27–Dec 3)
+- Plan for one possible rejection. A rejected upload was never published, so fix it and upload again with the **same** version. Anything already published, including the private beta, needs a higher version
+- Once approved: create a GitHub release from the tag you shipped, using its changelog entry as the notes
+- Watch the first few days of real users (~first week of December) for sync errors and sign-in failures
