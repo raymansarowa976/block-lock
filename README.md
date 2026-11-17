@@ -83,8 +83,9 @@ Open `apps/web/.env` and fill in each value:
 # PostgreSQL connection string
 DATABASE_URL="postgresql://postgres:password@localhost:5432/block_lock?schema=public"
 
-# Redis (local or Upstash)
-REDIS_URL="redis://localhost:6379"
+# Upstash Redis REST URL and read-write token (from the Upstash console)
+UPSTASH_REDIS_REST_URL="https://your-db.upstash.io"
+UPSTASH_REDIS_REST_TOKEN="your-upstash-rest-token"
 
 # Auth.js — generate a secret with: openssl rand -base64 32
 AUTH_URL="http://localhost:3000"
