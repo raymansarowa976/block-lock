@@ -95,12 +95,10 @@ For each bug: write it down with the steps, the expected and actual result, and 
 ## Phase 3: Private beta (Nov 13–25)
 
 ### Upload and connect: Fri Nov 13 (review ~Nov 14–18)
-- [ ] Upload the build as a **Private** listing (named testers only) or an **Unlisted** listing (anyone with the link) in the Chrome Web Store dashboard. Both go through review, so allow a few days
-- [ ] Fill in the store listing, privacy practices and permission explanations from Phase 4 now. Review needs them
-- [ ] Note the store-assigned extension ID and set `NEXT_PUBLIC_EXTENSION_ID` in Vercel production. **Redeploy**. `NEXT_PUBLIC_*` values are baked in at build time, so changing the variable alone does nothing (bug 7)
+- [x] Upload the build as a **Private** listing (named testers only) or an **Unlisted** listing (anyone with the link) in the Chrome Web Store dashboard. Both go through review, so allow a few days
+- [x] Fill in the store listing, privacy practices and permission explanations from Phase 4 now. Review needs them
+- [x] Note the store-assigned extension ID and set `NEXT_PUBLIC_EXTENSION_ID` in Vercel production. **Redeploy**. `NEXT_PUBLIC_*` values are baked in at build time, so changing the variable alone does nothing (bug 7)
   - A wrong ID fails silently: the dashboard sends the sign-in token to the wrong extension and the popup stays "Not Connected"
-  - Optional: copy the public key from the dashboard's **Package** tab into `manifest.json` as `"key"`, so local unpacked builds get the same ID
-- [ ] If Google sign-in is still in **Testing** mode, add each beta tester as a test user in Google Cloud Console
 
 ### Test and use it: once approved (~Nov 18–25)
 - [ ] In a **fresh Chrome profile** with no unpacked Block Lock, install from the store and confirm:
