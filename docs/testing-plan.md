@@ -123,18 +123,18 @@ For each bug: write it down with the steps, the expected and actual result, and 
   - Switch visibility to **Public** and submit
 
 ### Store listing
-- [ ] **Single purpose:** "Blocks distracting sites on user-defined schedules and daily time limits."
-- [ ] **Permission explanations:**
+- [x] **Single purpose:** "Blocks distracting sites on user-defined schedules and daily time limits."
+- [x] **Permission explanations:**
   - `declarativeNetRequest`: blocks the sites the user chose and redirects them to Block Lock's blocked page
   - `storage`: stores synced rules, the sign-in credential and daily usage on the device
   - `alarms`: re-checks schedule windows and daily limits every minute, syncs rules every 5 min (with quick retries after a failed sync), and uploads usage every 5 min
   - `idle`: checks whether the screen is locked so daily limits don't count time while the user is away. The lock state is never stored or sent anywhere
   - `<all_urls>` (expect the closest look at this one): reads the active tab's address to measure time per site for daily limits, redirects any site the user blocks to the blocked page, and lets the extension reach the Block Lock API
-- [ ] **Privacy practices:** say that you collect **web history** (domains visited and time on site, sent to the Block Lock server). Confirm you don't sell or transfer the data. Certify Limited Use compliance
-- [ ] **Privacy policy URL:** `https://blocklock.app/privacy`
-- [ ] **Assets:** 128×128 icon, at least one 1280×800 screenshot (popup, blocked page, dashboard), 440×280 small promo tile
-- [ ] **Description:** covers only what the extension itself does. AI features belong to the web app (per RELEASING.md)
-- [ ] Submit for review
+- [x] **Privacy practices:** say that you collect **web history** (domains visited and time on site, sent to the Block Lock server). Confirm you don't sell or transfer the data. Certify Limited Use compliance
+- [x] **Privacy policy URL:** `https://blocklock.app/privacy`
+- [x] **Assets:** 128×128 icon, at least one 1280×800 screenshot (popup, blocked page, dashboard), 440×280 small promo tile
+- [x] **Description:** covers only what the extension itself does. AI features belong to the web app (per RELEASING.md)
+- [x] Submit for review
 
 ### After submitting (review ~Nov 27–Dec 3)
 - Plan for one possible rejection. A rejected upload was never published, so fix it and upload again with the **same** version. Anything already published, including the private beta, needs a higher version
