@@ -4,7 +4,11 @@ import fs from "node:fs"
 import path from "node:path"
 import { fileURLToPath } from "node:url"
 import manifest from "../manifest.json"
-import { manifestForMode, DEV_EXTERNALLY_CONNECTABLE_MATCH } from "../scripts/manifest-for-mode.mjs"
+import {
+  manifestForMode,
+  DEV_EXTERNALLY_CONNECTABLE_MATCH,
+  STORE_PUBLIC_KEY,
+} from "../scripts/manifest-for-mode.mjs"
 
 const __dirname = fileURLToPath(new URL(".", import.meta.url))
 const EXTENSION_ROOT = path.join(__dirname, "..")
@@ -163,6 +167,45 @@ describe("manifestForMode", () => {
 
   it("matches the dev origin trusted by auth-handler", () => {
     expect(DEV_EXTERNALLY_CONNECTABLE_MATCH).toBe("http://localhost:3000/*")
+  })
+})
+
+// The store assigns the extension ID and rejects uploads whose manifest has a
+// "key" field. Development builds can carry the store's public key so a local
+// unpacked build gets the same ID as the store install.
+describe("manifestForMode – store public key", () => {
+  const KEY = "MIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEAtestkey"
+
+  it("manifest.json has no key field, which the store rejects", () => {
+    expect(m).not.toHaveProperty("key")
+  })
+
+  it("adds the key to development builds", () => {
+    const built = manifestForMode(m, "development", KEY) as ManifestV3 & { key?: string }
+    expect(built.key).toBe(KEY)
+  })
+
+  it("never adds the key to production (store) builds", () => {
+    const built = manifestForMode(m, "production", KEY)
+    expect(built).not.toHaveProperty("key")
+  })
+
+  it("adds no key to development builds when none is configured", () => {
+    const built = manifestForMode(m, "development", "")
+    expect(built).not.toHaveProperty("key")
+  })
+
+  it("defaults to the configured STORE_PUBLIC_KEY", () => {
+    const built = manifestForMode(m, "development") as ManifestV3 & { key?: string }
+    expect(built.key).toBe(STORE_PUBLIC_KEY || undefined)
+  })
+
+  // The dashboard shows the key wrapped in PEM lines; Chrome wants only the
+  // base64 body on one line.
+  it("STORE_PUBLIC_KEY is either empty or a bare base64 body", () => {
+    expect(typeof STORE_PUBLIC_KEY).toBe("string")
+    expect(STORE_PUBLIC_KEY).not.toMatch(/BEGIN|END|\s/)
+    expect(STORE_PUBLIC_KEY).toMatch(/^[A-Za-z0-9+/]*={0,2}$/)
   })
 })
 
