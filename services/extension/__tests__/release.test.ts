@@ -133,6 +133,23 @@ describe("repository release state", () => {
     expect(problems).toEqual([])
   })
 
+  // Two "### Fixed" headings in one version read as two separate lists to users
+  // and to whoever pastes the entry into a GitHub release.
+  it("no CHANGELOG.md version section repeats a subsection heading", () => {
+    const changelog = fs.readFileSync(path.join(EXTENSION_ROOT, "CHANGELOG.md"), "utf-8")
+    const repeated = changelog
+      .split(/^(?=## \[)/m)
+      .filter((section) => section.startsWith("## ["))
+      .flatMap((section) => {
+        const version = section.slice(0, section.indexOf("\n")).trim()
+        const headings = (section.match(/^### .+$/gm) ?? []).map((h) => h.trim())
+        return headings
+          .filter((h, i) => headings.indexOf(h) !== i)
+          .map((h) => `${version} → ${h}`)
+      })
+    expect(repeated).toEqual([])
+  })
+
   it("exposes a release script", () => {
     expect(readJson("package.json").scripts.release).toBe("node scripts/release.mjs")
   })
