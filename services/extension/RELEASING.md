@@ -103,3 +103,23 @@ that version was never published. Note the fix in the existing changelog entry.
 `0.1.0` is already recorded in `CHANGELOG.md` as the first store version. For the first upload,
 follow steps 3–8 (no bump needed) and tag the commit you submit as `extension-v0.1.0`. If the
 submission happens on a later day, update the entry's date.
+
+Three things outside this folder also need doing for the first submission:
+
+- **Publish the Google sign-in app.** In Google Cloud Console → Google Auth Platform → **Audience**,
+  switch the app from **Testing** to **In production**. In Testing mode only listed test users can
+  sign in, so store reviewers can't connect the extension and may reject it as not working. The
+  dashboard only asks for `openid`, `email` and `profile`, which don't need Google verification.
+  Also describe the sign-in steps on the store's **Test instructions** tab.
+- **Point the dashboard at the store's extension ID.** The ID is assigned when the first zip is
+  uploaded, before review. Set `NEXT_PUBLIC_EXTENSION_ID` to it in Vercel → Production and
+  **redeploy**: `NEXT_PUBLIC_*` values are built into the app, so changing the variable alone does
+  nothing. A wrong ID fails silently: sign-in never reaches the extension and the API rejects its
+  requests. To check, run
+  `curl -i -X OPTIONS https://blocklock.app/api/sync -H "Origin: chrome-extension://<ID>"` and expect
+  a `204` with that origin in `Access-Control-Allow-Origin`.
+- **Optional: give local builds the store ID.** Paste the base64 body from the dashboard's
+  **Package** → **View public key** (without the BEGIN/END lines) into `STORE_PUBLIC_KEY` in
+  `scripts/manifest-for-mode.mjs`. Only `pnpm dev` builds get it. Never add `"key"` to
+  `manifest.json`: the store rejects uploads that contain it. An unpacked build with the store ID
+  can't sit alongside the store install, so load it in a separate Chrome profile.
