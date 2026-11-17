@@ -11,7 +11,8 @@ import { PRIVACY_CONTACT_EMAIL } from "@/lib/constants"
 const LAST_UPDATED = "October 3, 2026"
 
 export const metadata: Metadata = {
-  title: "Privacy Policy · Block Lock",
+  // The root layout's title template appends "· Block Lock".
+  title: "Privacy Policy",
   description: "What data Block Lock collects, how it is used, and how to delete it.",
 }
 
